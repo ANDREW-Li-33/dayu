@@ -95,13 +95,15 @@ main{flex:1;min-height:0;position:relative}
 .doc .sub{color:var(--ink2);margin-bottom:24px}
 
 /* ---------- canvas ---------- */
-#board{position:absolute;inset:0;overflow:auto}
+#board{position:absolute;inset:0;overflow:auto;z-index:0} /* own stacking context, so raised notes stay under the toolbar */
 #field{
   position:relative;width:2600px;height:1800px;
   background-image:radial-gradient(var(--dots) 1.2px,transparent 1.2px);
   background-size:24px 24px;
   cursor:grab;
+  touch-action:none; /* drags on the canvas are ours: panning is done in script */
 }
+#field.panready{cursor:grab}
 #field.panning{cursor:grabbing;user-select:none}
 #field.drawing{cursor:crosshair}
 .hint{
@@ -112,7 +114,9 @@ main{flex:1;min-height:0;position:relative}
 
 /* zones: the area itself lets pointers through so the canvas can be panned across it */
 .zone{position:absolute;border-radius:14px;z-index:1;pointer-events:none}
-.zone .zbg{position:absolute;inset:0;border-radius:14px;opacity:.10;pointer-events:none}
+.zone .zbg{position:absolute;inset:0;border-radius:14px;opacity:.10;pointer-events:none;transition:opacity .15s ease}
+.zone.moving .zbg{opacity:.2}
+.zone.moving .zborder{opacity:.85}
 .zone .zborder{position:absolute;inset:0;border-radius:14px;border:1.5px dashed;opacity:.55;pointer-events:none}
 .zone .zhead{
   position:absolute;top:-1px;left:10px;transform:translateY(-50%);
@@ -342,7 +346,7 @@ main{flex:1;min-height:0;position:relative}
 .confetto{position:fixed;width:8px;height:8px;z-index:400;pointer-events:none;animation:confall .9s ease-in forwards}
 @keyframes confall{to{transform:translateY(120px) rotate(340deg);opacity:0}}
 .zonepop{
-  position:absolute;z-index:50;background:var(--surface);border:1px solid var(--line);
+  position:absolute;z-index:100000;background:var(--surface);border:1px solid var(--line);
   border-radius:12px;box-shadow:var(--shadow-big);padding:12px;display:flex;flex-direction:column;gap:9px;width:230px;
 }
 .zonepop .dots{display:flex;gap:7px}
@@ -1228,8 +1232,8 @@ async function syncNow() {
     const localTs = (STATE.meta && STATE.meta.updatedAt) || 0;
     const remoteTs = remote ? Date.parse(remote.updated_at) : 0;
     // Never swap the board out from under an open sheet: the user may be mid-edit in it.
-    const sheetOpen = modalNoteId || $('#modalRoot').classList.contains('open');
-    if (remote && remoteTs > localTs + 500 && !sheetOpen) {
+    const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging;
+    if (remote && remoteTs > localTs + 500 && !busy) {
       STATE = migrate(remote.data, false);
       STATE.meta.updatedAt = remoteTs;
       storeSet(STORE_KEY, JSON.stringify(STATE));
@@ -1504,15 +1508,12 @@ function buildZone(z) {
       h('button.zdel', { title: 'Remove this area (notes keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
     h('div.zresize', { title: 'Resize' }));
 
-  // move zone by its header
+  // move zone by its name tag (its empty interior works too, handled on the field)
   const head = $('.zhead', el);
   head.addEventListener('pointerdown', e => {
     if (e.target.closest('.zdel') || e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
-    dragXY(e, head, (dx, dy) => {
-      z.x = clamp(z.x + dx, 0, 2600 - z.w); z.y = clamp(z.y + dy, 14, 1800 - z.h);
-      el.style.left = z.x + 'px'; el.style.top = z.y + 'px';
-    }, () => save());
+    startZoneDrag(z, e, head);
   });
   // resize
   const rz = $('.zresize', el);
@@ -1526,6 +1527,87 @@ function buildZone(z) {
   });
   return el;
 }
+// Everything sitting inside the area right now, by position rather than by category,
+// so what moves with a cluster is exactly what you can see inside it.
+function notesInsideZone(z) {
+  const out = [];
+  for (const n of STATE.notes) {
+    if (n.archived) continue;
+    const el = $('.note[data-id="' + n.id + '"]');
+    const halfH = el ? el.offsetHeight / 2 : 32;
+    const cx = n.x + NOTE_W / 2, cy = n.y + halfH;
+    if (cx >= z.x && cx <= z.x + z.w && cy >= z.y && cy <= z.y + z.h) out.push({ n, el, x0: n.x, y0: n.y });
+  }
+  return out;
+}
+// Drag a cluster and carry its contents. `grabEl` is whatever received the pointer.
+function startZoneDrag(z, e, grabEl) {
+  const el = $('.zone[data-id="' + z.id + '"]');
+  if (!el) return;
+  const riders = notesInsideZone(z);
+  const zx0 = z.x, zy0 = z.y;
+  const sx = e.clientX, sy = e.clientY;
+  let moved = false;
+  // A rider's centre can sit inside the area while its body hangs outside it, so the
+  // travel allowed is whatever BOTH the area and every passenger can absorb.
+  let minDx = -zx0, maxDx = (2600 - z.w) - zx0;
+  let minDy = 14 - zy0, maxDy = (1800 - z.h) - zy0;
+  for (const r of riders) {
+    minDx = Math.max(minDx, -r.x0);
+    maxDx = Math.min(maxDx, (2600 - NOTE_W) - r.x0);
+    minDy = Math.max(minDy, -r.y0);
+    maxDy = Math.min(maxDy, (1800 - 70) - r.y0);
+  }
+  zoneDragging = true;
+  try { grabEl.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+  const place = (dx, dy) => {
+    z.x = zx0 + dx; z.y = zy0 + dy;
+    el.style.left = z.x + 'px'; el.style.top = z.y + 'px';
+    for (const r of riders) {
+      r.n.x = r.x0 + dx; r.n.y = r.y0 + dy;
+      if (r.el) { r.el.style.left = r.n.x + 'px'; r.el.style.top = r.n.y + 'px'; }
+    }
+  };
+  const mv = ev => {
+    if (ev.pointerId !== e.pointerId) return;
+    const rawX = ev.clientX - sx, rawY = ev.clientY - sy;
+    if (!moved) {
+      if (Math.abs(rawX) + Math.abs(rawY) < 4) return;
+      moved = true;
+      el.classList.add('moving');
+    }
+    if (ev.cancelable) ev.preventDefault();
+    place(clamp(rawX, minDx, maxDx), clamp(rawY, minDy, maxDy));
+  };
+  const teardown = () => {
+    zoneDragging = false;
+    grabEl.removeEventListener('pointermove', mv);
+    grabEl.removeEventListener('pointerup', up);
+    grabEl.removeEventListener('pointercancel', cancel);
+    window.removeEventListener('pointerup', up);
+    window.removeEventListener('pointercancel', cancel);
+    el.classList.remove('moving');
+    try { grabEl.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+  };
+  const up = ev => {
+    if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+    teardown();
+    if (moved) save();
+  };
+  // An interrupted gesture (the browser claiming it, a call taking over the screen) is
+  // not a decision to move anything, so put everything back.
+  const cancel = ev => {
+    if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+    if (moved) place(0, 0);
+    moved = false;
+    teardown();
+  };
+  grabEl.addEventListener('pointermove', mv);
+  grabEl.addEventListener('pointerup', up);
+  grabEl.addEventListener('pointercancel', cancel);
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', cancel);
+}
 function removeZone(id) {
   undoableAction('Cluster area removed. Notes kept their category', () => {
     STATE.zones = STATE.zones.filter(z => z.id !== id);
@@ -1534,7 +1616,7 @@ function removeZone(id) {
 // generic incremental drag helper: cb gets deltas since last move
 function dragXY(e, elm, onMove, onUp) {
   let lx = e.clientX, ly = e.clientY;
-  elm.setPointerCapture(e.pointerId);
+  try { elm.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
   const mv = ev => { onMove(ev.clientX - lx, ev.clientY - ly); lx = ev.clientX; ly = ev.clientY; };
   const up = () => { elm.removeEventListener('pointermove', mv); elm.removeEventListener('pointerup', up); elm.removeEventListener('pointercancel', up); if (onUp) onUp(); };
   elm.addEventListener('pointermove', mv);
@@ -1583,7 +1665,7 @@ function buildNote(n) {
     e.preventDefault();
     const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
     let moved = false;
-    el.setPointerCapture(e.pointerId);
+    try { el.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
       if (!moved && Math.abs(dx) + Math.abs(dy) > 5) {
@@ -1608,6 +1690,22 @@ function buildNote(n) {
     el.addEventListener('pointercancel', up);
   });
   return el;
+}
+
+// Save a note title that is still being typed. Called before the canvas takes over a
+// gesture: relying on the textarea's blur alone is not dependable, since a blur raised
+// while the page itself is unfocused does not always reach the listener.
+function commitOpenNoteEditor() {
+  const ta = $('.note textarea');
+  if (!ta) return;
+  const noteEl = ta.closest('.note');
+  const n = noteEl && noteById(noteEl.dataset.id);
+  ta.blur();
+  if (!n || !n.editing) return; // the blur listener already did it
+  delete n.editing;
+  n.title = ta.value.trim();
+  if (!n.title) STATE.notes = STATE.notes.filter(x => x.id !== n.id);
+  save(); renderCanvas();
 }
 
 function zoneAt(cx, cy) {
@@ -1689,7 +1787,9 @@ function toggleDone(id) {
 }
 
 /* ---------- draw-cluster mode ---------- */
-let cancelDraw = null; // tears down an in-progress cluster drag, if there is one
+let spaceHeld = false;    // space turns any drag into a pan, the usual canvas convention
+let zoneDragging = false; // a cluster is mid-drag: hold off re-rendering it out from under the pointer
+let cancelDraw = null;    // tears down an in-progress cluster draw, if there is one
 function setDrawMode(on) {
   if (!on && cancelDraw) cancelDraw();
   drawMode = on;
@@ -1707,10 +1807,19 @@ function wireCanvas() {
     newNoteAt(e.clientX - r.left - NOTE_W / 2, e.clientY - r.top - 20);
   });
 
-  // Drag empty canvas to pan. Notes, zone headers and the draw tool claim the pointer first.
+  // Empty canvas drags the view; empty space inside a cluster drags that cluster and its
+  // contents. Middle button, or space held, always pans so a big cluster cannot trap you.
   field.addEventListener('pointerdown', e => {
-    if (drawMode || e.button !== 0) return;
+    if (drawMode) return;
+    const panOverride = e.button === 1 || spaceHeld;
+    if (e.button !== 0 && !panOverride) return;
     if (e.target.closest('.note, .zhead, .zresize, .zonepop')) return;
+    commitOpenNoteEditor(); // finish any title being typed before taking over the gesture
+    if (!panOverride) {
+      const fr = field.getBoundingClientRect();
+      const z = zoneAt(e.clientX - fr.left, e.clientY - fr.top);
+      if (z) { startZoneDrag(z, e, field); return; }
+    }
     const sx = e.clientX, sy = e.clientY;
     const sl = board.scrollLeft, st = board.scrollTop;
     let panning = false;
@@ -1724,6 +1833,7 @@ function wireCanvas() {
         panning = true;
         field.classList.add('panning');
       }
+      if (ev.cancelable) ev.preventDefault(); // only once this is genuinely a drag
       board.scrollLeft = sl - dx;
       board.scrollTop = st - dy;
     };
@@ -1753,7 +1863,7 @@ function wireCanvas() {
     const prev = $('#drawPreview');
     prev.style.display = 'block';
     let w = 0, hgt = 0, x = ax, y = ay;
-    field.setPointerCapture(e.pointerId);
+    try { field.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
       const bx = ev.clientX - r.left, by = ev.clientY - r.top;
       x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hgt = Math.abs(by - ay);
@@ -1775,9 +1885,25 @@ function wireCanvas() {
     field.addEventListener('pointercancel', up);
   });
 
+  // Space belongs to whatever is focused: it types, and it presses buttons. Only claim it
+  // when the bare canvas has focus and nothing is layered over it.
+  const spaceIsOurs = t => {
+    if (currentPage() !== 'canvas') return false;
+    if ($('#welcome') || $('#modalRoot').classList.contains('open')) return false;
+    if (!t || t === document.body || t === field || t === $('#board')) return true;
+    return false;
+  };
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { setDrawMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
+    if (e.code === 'Space' && spaceIsOurs(e.target)) {
+      if (!spaceHeld) { spaceHeld = true; field.classList.add('panready'); }
+      e.preventDefault(); // stop the page from scrolling under us
+    }
   });
+  document.addEventListener('keyup', e => {
+    if (e.code === 'Space') { spaceHeld = false; field.classList.remove('panready'); }
+  });
+  window.addEventListener('blur', () => { spaceHeld = false; field.classList.remove('panready'); });
 }
 
 function zoneNamePopover(x, y, w, hgt) {
