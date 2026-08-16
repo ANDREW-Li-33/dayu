@@ -953,6 +953,26 @@ async function signInWithGoogle() {
   location.href = CFG.sbUrl + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(redirect)
     + '&code_challenge=' + challenge + '&code_challenge_method=s256';
 }
+// Turn provider jargon into something a person can act on.
+function explainAuthError(raw) {
+  const s = String(raw || '');
+  if (/unable to exchange external code/i.test(s)) {
+    return 'Google refused the hand-off. The Client Secret saved in Supabase does not match the Google OAuth client. Copy the secret again from Google Cloud (APIs & Services, Credentials, your Web application client) and paste it into Supabase under Authentication, Sign In / Providers, Google.';
+  }
+  if (/redirect_uri_mismatch/i.test(s)) {
+    return 'Google rejected the callback address. In Google Cloud, the client\'s Authorized redirect URI must be exactly the callback URL shown in Supabase\'s Google provider panel.';
+  }
+  if (/provider is not enabled|unsupported provider/i.test(s)) {
+    return 'Google sign-in is switched off for this project. Enable the Google provider in Supabase.';
+  }
+  if (/access_denied/i.test(s)) {
+    return 'Sign-in was cancelled, or this Google account is not on the test-user list while the consent screen is in Testing mode.';
+  }
+  if (/bad_oauth_state|flow state|state/i.test(s) && /expired|not found|invalid/i.test(s)) {
+    return 'That sign-in attempt expired. Try Continue with Google once more.';
+  }
+  return s;
+}
 // On load: finish an OAuth redirect if one is in the URL (PKCE ?code=, or implicit #access_token=)
 function clearPending() { storeSet('dayu-oauth-pending', ''); }
 function cleanUrl(keepHash) {
@@ -983,7 +1003,7 @@ async function handleAuthRedirect() {
         applySession(j.access_token, j.refresh_token);
         toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : ''));
       } else {
-        showNotice('sb-oauth', 'Google sign-in failed at the last step: ' + (j.error_description || j.msg || j.error || ('HTTP ' + r.status)));
+        showNotice('sb-oauth', 'Google sign-in failed. ' + explainAuthError(j.error_description || j.msg || j.error || ('HTTP ' + r.status)));
       }
       return;
     }
@@ -998,7 +1018,7 @@ async function handleAuthRedirect() {
         return;
       }
       if (hs.get('error') || hs.get('error_description')) {
-        showNotice('sb-oauth', 'Google sign-in failed: ' + (hs.get('error_description') || hs.get('error')));
+        showNotice('sb-oauth', 'Google sign-in failed. ' + explainAuthError(hs.get('error_description') || hs.get('error')));
         clearPending(); cleanUrl(false);
         return;
       }
@@ -1006,7 +1026,7 @@ async function handleAuthRedirect() {
 
     // 3. An error came back on the query string.
     if (qs.get('error') || qs.get('error_description')) {
-      showNotice('sb-oauth', 'Google sign-in failed: ' + (qs.get('error_description') || qs.get('error')));
+      showNotice('sb-oauth', 'Google sign-in failed. ' + explainAuthError(qs.get('error_description') || qs.get('error')));
       clearPending(); cleanUrl(true);
       return;
     }
