@@ -417,6 +417,25 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .haddrow input{width:100%;border:none;outline:none;background:transparent;padding:10px 12px;font-size:13px}
 .todaychip{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
 
+/* ---------- archive view switch & goal history ---------- */
+.segbar{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--raise);border:1px solid var(--line);margin-bottom:18px}
+.seg{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:700;color:var(--ink2)}
+.seg:hover{color:var(--ink)}
+.seg.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.ghist-sum{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:6px 16px}
+.ghist-row{display:flex;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ghist-row:last-child{border-bottom:none}
+.ghr-name{font-weight:700;font-size:13.5px;flex:1;min-width:130px}
+.ghr-tag{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin-left:7px}
+.ghr-pct{font-weight:800;font-size:15px;font-variant-numeric:tabular-nums}
+.ghr-detail{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.htable.hmonth{min-width:0}
+.htable.hmonth .hcell{width:26px;height:26px}
+.htable.hmonth th.hname,.htable.hmonth td.hname{min-width:140px;max-width:190px;font-size:12.5px}
+.htable.hmonth thead th{padding:6px 2px 5px}
+.htable.hmonth td.futurecol{opacity:.35}
+.htable.hmonth td.futurecol .hcell{cursor:default}
+
 /* ---------- dashboard ---------- */
 .statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
 .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
@@ -1045,18 +1064,6 @@ function applySession(access, refresh) {
   saveCfg();
   clearNotice('sb-signin');
 }
-async function sbSignIn(email, pass) {
-  const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=password', {
-    method: 'POST',
-    headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: pass }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error_description || j.msg || ('Sign-in failed (HTTP ' + r.status + ')'));
-  applySession(j.access_token, j.refresh_token);
-  syncNow();
-  return true;
-}
 /* ---- Google sign-in (PKCE, no library) ----
    Returns {ok:true} when the browser is being handed to Google, or {ok:false, message}
    so a caller such as the welcome card can show the reason in its own surface. */
@@ -1069,7 +1076,7 @@ async function signInWithGoogle() {
   try {
     const s = await fetch(CFG.sbUrl + '/auth/v1/settings', { headers: { apikey: CFG.sbAnon } }).then(x => x.json());
     if (s && s.external && s.external.google === false) {
-      return authFail('sb-google', 'Google sign-in is not switched on for this project yet. Use email and password for now, or enable the Google provider in Supabase (see SETUP.md).');
+      return authFail('sb-google', 'Google sign-in is not switched on for this project yet. Enable the Google provider in Supabase (see SETUP.md).');
     }
   } catch (e) {
     return authFail('sb-net', 'Cannot reach the sign-in service from this page. If this is the preview page, open Dayu from its own address instead.');
@@ -1383,16 +1390,7 @@ function openSettings() {
   // --- Supabase ---
   const sec = h('div.setsec', {}, h('span.label', {}, 'Account & sync'));
   const authRow = h('div');
-  sec.append(authRow);
-  // connection details, collapsed since they ship with the app
-  const urlIn = h('input.input.grow', { placeholder: 'https://yourproject.supabase.co', value: CFG.sbUrl, autocomplete: 'off' });
-  urlIn.addEventListener('input', () => { CFG.sbUrl = urlIn.value.trim().replace(/\/+$/, ''); saveCfg(); syncStatus(SB.status); });
-  const anonIn = h('input.input.grow', { type: 'password', placeholder: 'Publishable (or legacy anon) key', value: CFG.sbAnon, autocomplete: 'off' });
-  anonIn.addEventListener('input', () => { CFG.sbAnon = anonIn.value.trim(); saveCfg(); syncStatus(SB.status); });
-  const det = h('details', { style: { marginTop: '10px' } },
-    h('summary', { style: { cursor: 'pointer', fontSize: '12px', color: 'var(--ink3)', fontWeight: '700' } }, 'Connection details (project URL and key)'),
-    h('div.frow', {}, urlIn), h('div.frow', {}, anonIn));
-  sec.append(det, h('div.setnote', {}, 'Sign in and your board follows you to any device. Accounts are free; each person sees only their own board. Owner setup lives in SETUP.md.'));
+  sec.append(authRow, h('div.setnote', {}, 'Sign in and your board follows you to any device. Accounts are free; each person sees only their own board.'));
   body.append(sec);
 
   function renderAuth() {
@@ -1407,21 +1405,7 @@ function openSettings() {
           h('span', { style: { fontSize: '12px', color: 'var(--ink3)' } }, last)));
       return;
     }
-    const gbtn = h('button.btn.primary', { onclick: () => signInWithGoogle() }, 'Continue with Google');
-    authRow.append(h('div.frow', {}, gbtn));
-    const em = h('input.input.grow', { type: 'email', placeholder: 'Email', value: CFG.sbEmail, autocomplete: 'off' });
-    const pw = h('input.input.grow', { type: 'password', placeholder: 'Password', autocomplete: 'off' });
-    const stat = h('span', { style: { fontSize: '12.5px' } });
-    const btn = h('button.btn.small', { onclick: async () => {
-      btn.disabled = true; stat.textContent = 'Signing in…'; stat.className = '';
-      try { await sbSignIn(em.value.trim(), pw.value); stat.textContent = ''; renderAuth(); }
-      catch (err) { stat.textContent = '✕ ' + err.message; stat.className = 'errline'; }
-      btn.disabled = false;
-    } }, 'Sign in');
-    pw.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
-    authRow.append(
-      h('div.setnote', { style: { marginTop: '10px' } }, 'or with email and password:'),
-      h('div.frow', {}, em, pw, btn), h('div.frow', {}, stat));
+    authRow.append(h('div.frow', {}, h('button.btn.primary', { onclick: () => signInWithGoogle() }, 'Continue with Google')));
   }
   renderAuth();
 
@@ -2198,6 +2182,101 @@ function renderHabitSheet() {
   return box;
 }
 
+/* ---------- full goal-tracking history (archive page) ---------- */
+function monthKeyOf(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+function monthsWithHistory() {
+  // Every month from the first day anyone tracked through the current one, newest first.
+  const all = STATE.habits;
+  if (!all.length) return [];
+  let earliest = Infinity;
+  for (const hb of all) {
+    earliest = Math.min(earliest, startOfDay(hb.createdAt || Date.now()));
+    for (const k of Object.keys(hb.days)) earliest = Math.min(earliest, startOfDay(keyToTs(k)));
+  }
+  if (!isFinite(earliest)) return [];
+  const out = [];
+  const now = new Date();
+  const cur = new Date(now.getFullYear(), now.getMonth(), 1);
+  const first = new Date(earliest);
+  const walk = new Date(first.getFullYear(), first.getMonth(), 1);
+  while (walk <= cur) { out.push({ y: walk.getFullYear(), m: walk.getMonth() }); walk.setMonth(walk.getMonth() + 1); }
+  return out.reverse();
+}
+function monthDayKeys(y, m) {
+  const days = new Date(y, m + 1, 0).getDate();
+  const out = [];
+  for (let d = 1; d <= days; d++) out.push(y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'));
+  return out;
+}
+function renderGoalHistory() {
+  const wrap = h('div');
+  const all = STATE.habits.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (!all.length) {
+    wrap.append(h('div.empty', {}, 'No daily goals yet. Add some on the Goals page and their whole history shows up here.'));
+    return wrap;
+  }
+
+  // per-goal totals across the entire history
+  const summary = h('div.ghist-sum');
+  for (const hb of all) {
+    const s = habitStats(hb);
+    const marks = Object.values(hb.days);
+    const y = marks.filter(v => v === 'yellow').length, rd = marks.filter(v => v === 'red').length;
+    summary.append(h('div.ghist-row', {},
+      h('span.ghr-name', {}, hb.name, hb.archivedAt ? h('span.ghr-tag', {}, 'retired') : null),
+      h('span.ghr-pct', {}, s.pct + '%'),
+      h('span.ghr-detail', {}, s.checked + ' green'
+        + (y ? ', ' + y + ' yellow' : '') + (rd ? ', ' + rd + ' red' : '')
+        + ' of ' + s.totalDays + ' days · best streak ' + s.best)));
+  }
+  wrap.append(h('div.dsec', {}, h('span.label', {}, 'Totals so far'), summary));
+
+  const months = monthsWithHistory();
+  const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const tk = todayKey();
+  for (const { y, m } of months) {
+    const keys = monthDayKeys(y, m);
+    // Skip a month nobody marked, unless it is the current one.
+    const anyMarks = all.some(hb => keys.some(k => hb.days[k]));
+    if (!anyMarks && monthKeyOf(Date.now()) !== y + '-' + String(m + 1).padStart(2, '0')) continue;
+    // A goal belongs in this month if it was marked here, or if it was already alive then
+    // and had not yet been retired: no rows for months before a goal existed.
+    const monthEnd = keyToTs(keys[keys.length - 1]);
+    const monthStart = keyToTs(keys[0]);
+    const rows = all.filter(hb => keys.some(k => hb.days[k])
+      || (startOfDay(hb.createdAt) <= monthEnd && (!hb.archivedAt || hb.archivedAt >= monthStart)));
+    if (!rows.length) continue;
+
+    const thead = h('thead', {}, h('tr', {},
+      h('th.hname', {}, ''),
+      keys.map(k => {
+        const d = new Date(k + 'T12:00');
+        return h('th' + (k === tk ? '.todaycol' : ''), {}, letters[d.getDay()], h('span.dnum', {}, String(d.getDate())));
+      })));
+    const tbody = h('tbody');
+    for (const hb of rows) {
+      const tr = h('tr', {}, h('td.hname', {}, hb.name, hb.archivedAt ? h('span.ghr-tag', {}, 'retired') : null));
+      for (const k of keys) {
+        const future = keyToTs(k) > Date.now();
+        const title = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '');
+        const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: title(), disabled: future });
+        if (!future) cell.addEventListener('click', () => {
+          toggleHabit(hb, k);
+          cell.className = 'hcell' + (hb.days[k] ? ' c-' + hb.days[k] : '');
+          cell.title = title();
+        });
+        tr.append(h('td' + (k === tk ? '.todaycol' : '') + (future ? '.futurecol' : ''), {}, cell));
+      }
+      tbody.append(tr);
+    }
+    const label = new Date(y, m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    wrap.append(h('div.dsec', {},
+      h('span.label', {}, label),
+      h('div.hwrap', {}, h('table.htable.hmonth', {}, thead, tbody))));
+  }
+  return wrap;
+}
+
 /* ---------- dashboard page ---------- */
 function renderDashboard() {
   const inner = $('#dashInner');
@@ -2330,6 +2409,7 @@ function buildDashSummarySection() {
 
 /* ---------- archive ---------- */
 const afilters = { q: '', cats: new Set(), from: '', to: '', quick: 'all' };
+let archiveView = 'tasks'; // 'tasks' or 'goals'
 
 function archivedNotes() {
   let list = STATE.notes.filter(n => n.archived && n.completedAt);
@@ -2346,7 +2426,17 @@ function archivedNotes() {
 function renderArchive() {
   const inner = $('#archiveInner');
   inner.innerHTML = '';
-  inner.append(h('h1', {}, 'Archive'), h('div.sub', {}, 'Everything you’ve finished. Filter, restore, or run a summary.'));
+  inner.append(h('h1', {}, 'Archive'),
+    h('div.sub', {}, archiveView === 'goals'
+      ? 'Every day you have marked, all the way back. Click any cell to correct it.'
+      : 'Everything you’ve finished. Filter, restore, or run a summary.'));
+
+  // --- which archive are we looking at ---
+  const seg = h('div.segbar', {}, [['tasks', 'Completed tasks'], ['goals', 'Goal history']].map(([v, l]) =>
+    h('button.seg' + (archiveView === v ? '.on' : ''), { onclick: () => { archiveView = v; renderArchive(); } }, l)));
+  inner.append(seg);
+
+  if (archiveView === 'goals') { inner.append(renderGoalHistory()); return; }
 
   // --- filters ---
   const qIn = h('input.input.grow', { placeholder: 'Search by name…', value: afilters.q });
