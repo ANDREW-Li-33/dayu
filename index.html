@@ -7,7 +7,7 @@
   --paper:#F5F2E9; --dots:#DAD4C2; --surface:#FFFFFF; --raise:#FBFAF5;
   --ink:#17161B; --ink2:#5D5B64; --ink3:#93909B; --line:#E4E0D2; --line2:#D2CDBB;
   --accent:#2B3FD6; --accent-hover:#1F2FA8; --accent-ink:#FFFFFF; --accent-soft:rgba(43,63,214,.09);
-  --good:#187A48; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08);
+  --good:#187A48; --warn:#B4790E; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08);
   --shadow:0 1px 2px rgba(23,22,27,.07),0 8px 22px rgba(23,22,27,.11);
   --shadow-big:0 4px 10px rgba(23,22,27,.10),0 24px 60px rgba(23,22,27,.22);
   --note-ink:#262212; --note-ink2:rgba(38,34,18,.62);
@@ -17,7 +17,7 @@
     --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
     --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
     --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-    --good:#53C98D; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+    --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
     --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
     --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
   }
@@ -26,7 +26,7 @@
   --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
   --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
   --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-  --good:#53C98D; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+  --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
   --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
   --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
 }
@@ -269,6 +269,7 @@ main{flex:1;min-height:0;position:relative}
 .meta .mitem{display:flex;flex-direction:column;gap:2px}
 .meta .mval{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
 .sfoot{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:var(--raise)}
+.sfoot .screated{font-size:11.5px;font-weight:700;color:var(--ink3)}
 
 /* ---------- archive ---------- */
 .filters{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:18px}
@@ -407,10 +408,11 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .htable .htools button{width:20px;height:20px;border-radius:5px;color:var(--ink3);font-size:11px;line-height:1}
 .htable .htools button:hover{background:var(--accent-soft);color:var(--ink)}
 .htable .todaycol{background:var(--accent-soft)}
-.hcell{width:36px;height:36px;padding:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center}
-.hcell svg{width:13px;height:13px}
-.hcell .tickpath{stroke:var(--accent);stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.hcell{width:36px;height:36px;padding:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center;transition:background .1s ease}
 .hcell:hover{background:var(--accent-soft)}
+.hcell.c-green{background:var(--good)}
+.hcell.c-yellow{background:var(--warn)}
+.hcell.c-red{background:var(--danger)}
 .htable td.hname input{width:100%;border:none;outline:none;background:transparent;font:inherit}
 .haddrow input{width:100%;border:none;outline:none;background:transparent;padding:10px 12px;font-size:13px}
 .todaychip{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
@@ -428,7 +430,9 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .hab .hmeta{font-size:12px;color:var(--ink2);margin-top:2px}
 .hab .strip{display:flex;gap:3px;margin-top:10px;flex-wrap:wrap}
 .sq{width:12px;height:12px;border-radius:3px;background:var(--line)}
-.sq.on{background:var(--accent)}
+.sq.c-green{background:var(--good)}
+.sq.c-yellow{background:var(--warn)}
+.sq.c-red{background:var(--danger)}
 .sq.today{outline:2px solid var(--accent);outline-offset:1px}
 .hab.retired{opacity:.8}
 .dsec{margin-top:26px}
@@ -610,7 +614,7 @@ function save() {
 }
 function blankState() {
   return {
-    v: 3, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
+    v: 4, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
     ai: { key: '', model: 'gemini-flash-latest', lastVersion: '' },
     meta: { updatedAt: Date.now() },
   };
@@ -652,6 +656,21 @@ function migrate(s, adoptLocal) {
     // model reports itself through the notice bar instead of being silently overridden.
     if (/^gemini-2\./.test(s.ai.model)) { s.ai.model = 'gemini-flash-latest'; s.ai.lastVersion = ''; }
     s.v = 3;
+  }
+  // v4: daily-goal cells now cycle blank -> green -> yellow -> red instead of a single
+  // check, and the model picker was trimmed to two choices. Both are one-time normalizations.
+  if ((s.v || 1) < 4) {
+    for (const hb of s.habits) {
+      if (!hb.days || typeof hb.days !== 'object') hb.days = {};
+      for (const k of Object.keys(hb.days)) {
+        const v = hb.days[k];
+        if (v !== 'green' && v !== 'yellow' && v !== 'red') hb.days[k] = 'green'; // old checkmark meant "done"
+      }
+    }
+    if (s.ai.model !== 'gemini-flash-latest' && s.ai.model !== 'gemini-flash-lite-latest') {
+      s.ai.model = 'gemini-flash-latest'; s.ai.lastVersion = '';
+    }
+    s.v = 4;
   }
   return s;
 }
@@ -883,7 +902,6 @@ let CFG = { gemKey: '', gemModel: 'gemini-flash-latest', sbUrl: '', sbAnon: '', 
 function saveCfg() { storeSet(CFG_KEY, JSON.stringify(CFG)); }
 // The AI key and model live in the synced state, so they follow the account to every device.
 const AI_FALLBACK = { key: '', model: 'gemini-flash-latest', lastVersion: '' };
-let cachedModels = null; // model names fetched with the user's own key, this session only
 function aiCfg() { return (STATE && STATE.ai) ? STATE.ai : AI_FALLBACK; }
 function aiConfigured() { return !!aiCfg().key; }
 
@@ -933,7 +951,7 @@ async function gemini(prompt) {
   if (r.status === 404) {
     let msg = '';
     try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* ignore */ }
-    showNotice('gem-model', 'That model is not available to this key: ' + (msg || model) + ' Pick another in Settings, or press Refresh list to see what your key can use.');
+    showNotice('gem-model', 'That model is not available to this key: ' + (msg || model) + ' Pick another one in Settings.');
     throw { code: 'model' };
   }
   if (!r.ok) throw { code: 'http' + r.status };
@@ -947,24 +965,6 @@ async function gemini(prompt) {
   if (j.modelVersion && j.modelVersion !== cur.lastVersion) { cur.lastVersion = j.modelVersion; save(); }
   clearNotice('gem-key'); clearNotice('gem-quota'); clearNotice('gem-model');
   return text.trim();
-}
-// Ask the key which models it may actually use, so the picker shows real options.
-async function listGeminiModels() {
-  const ai = aiCfg();
-  if (!ai.key) throw { code: 'nokey' };
-  let r;
-  try {
-    r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': ai.key } });
-  } catch (e) { throw { code: 'net' }; }
-  if (r.status === 429) throw { code: 'quota' };
-  if (r.status === 400 || r.status === 401 || r.status === 403) throw { code: 'key' };
-  if (!r.ok) throw { code: 'http' + r.status };
-  const j = await r.json();
-  return (j.models || [])
-    .filter(m => (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0)
-    .map(m => String(m.name || '').replace(/^models\//, ''))
-    .filter(n => n && !/tts|image|robotics|lyria|computer-use|embedding|deep-research|antigravity|omni|banana/i.test(n))
-    .sort();
 }
 function modelLabel() {
   const ai = aiCfg();
@@ -1344,7 +1344,6 @@ function openSettings() {
   const ALIASES = [
     ['gemini-flash-latest', 'Gemini Flash, latest (default)'],
     ['gemini-flash-lite-latest', 'Gemini Flash-Lite, latest (higher free limits)'],
-    ['gemini-pro-latest', 'Gemini Pro, latest (small free quota)'],
   ];
   const keyIn = h('input.input.grow', { type: 'password', placeholder: 'Paste your AI Studio API key', value: ai.key, autocomplete: 'off' });
   keyIn.addEventListener('input', () => {
@@ -1352,34 +1351,15 @@ function openSettings() {
     clearNotice('gem-key'); clearNotice('gem-quota'); // a new key invalidates the old complaint
     save();
   });
-  const modelSel = h('select.input.grow');
-  const nowLine = h('div.setnote');
-  function paintNow() {
-    const a = aiCfg();
-    nowLine.textContent = a.lastVersion
-      ? 'Answers are coming from ' + a.lastVersion + (/latest/.test(a.model || '') ? ', which is what "' + a.model + '" points to today.' : '.')
-      : 'Press Test to see exactly which model version answers.';
-  }
-  function fillModels(extra) {
-    const a = aiCfg();
-    const seen = [];
-    modelSel.innerHTML = '';
-    for (const [v, l] of ALIASES) { seen.push(v); modelSel.append(h('option', { value: v, selected: a.model === v }, l)); }
-    for (const m of (extra || [])) {
-      if (seen.indexOf(m) >= 0) continue;
-      seen.push(m);
-      modelSel.append(h('option', { value: m, selected: a.model === m }, m));
-    }
-    // A model saved on another device may not be in the list yet: keep it selectable.
-    if (a.model && seen.indexOf(a.model) < 0) modelSel.append(h('option', { value: a.model, selected: true }, a.model));
-    paintNow();
-  }
-  fillModels(cachedModels);
+  const modelSel = h('select.input.grow', {}, ALIASES.map(([v, l]) => h('option', { value: v, selected: ai.model === v }, l)));
+  // A model picked before this build, or mid-sync from another device, might not be one
+  // of the two above; keep it selectable rather than silently switching it out from under them.
+  if (ai.model && !ALIASES.some(([v]) => v === ai.model)) modelSel.append(h('option', { value: ai.model, selected: true }, ai.model));
   modelSel.addEventListener('change', () => {
     aiCfg().model = modelSel.value;
     aiCfg().lastVersion = '';
     clearNotice('gem-model'); // the complaint was about the model they just replaced
-    save(); paintNow();
+    save();
   });
 
   const aiStatus = h('span', { style: { fontSize: '12.5px', fontWeight: '700' } });
@@ -1393,28 +1373,12 @@ function openSettings() {
       aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', '').replace(', so this is the locally computed fallback', '');
       aiStatus.className = 'errline';
     }
-    paintNow();
     testBtn.disabled = false;
   } }, 'Test');
-  const refreshBtn = h('button.btn.small', { onclick: async () => {
-    refreshBtn.disabled = true; aiStatus.textContent = 'Loading models…'; aiStatus.className = '';
-    try {
-      cachedModels = await listGeminiModels();
-      fillModels(cachedModels);
-      aiStatus.textContent = '✓ ' + cachedModels.length + ' models available to this key';
-      aiStatus.className = 'okline';
-    } catch (err) {
-      aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', '');
-      aiStatus.className = 'errline';
-    }
-    refreshBtn.disabled = false;
-  } }, 'Refresh list');
   body.append(h('div.setsec', {},
     h('span.label', {}, 'Google AI'),
     h('div.frow', {}, keyIn),
-    h('div.frow', {}, modelSel, refreshBtn, testBtn, aiStatus),
-    nowLine,
-    h('div.setnote', {}, 'Free key from aistudio.google.com, API keys page. Powers “Draft steps” and both Summarize buttons. Your key is saved to your account, so you enter it once and every device you sign in on picks it up.')));
+    h('div.frow', {}, modelSel, testBtn, aiStatus)));
 
   // --- Supabase ---
   const sec = h('div.setsec', {}, h('span.label', {}, 'Account & sync'));
@@ -1999,15 +1963,15 @@ function openNote(id) {
   body.append(h('div.sec', {}, h('div.sechead', {}, h('span.label', {}, 'Category')), pick));
   renderCatPick(n, pick, sheet);
 
-  // meta
-  const metaBox = h('div.meta', {},
-    h('div.mitem', {}, h('span.label', {}, 'Created'), h('span.mval', {}, fmtFull(n.createdAt))),
-    n.completedAt ? h('div.mitem', {}, h('span.label', {}, 'Completed'), h('span.mval', {}, fmtFull(n.completedAt))) : null);
-  body.append(metaBox);
+  // completion date, if any, stays with the other detail up here; creation date moves to the footer below
+  if (n.completedAt) {
+    body.append(h('div.meta', {}, h('div.mitem', {}, h('span.label', {}, 'Completed'), h('span.mval', {}, fmtFull(n.completedAt)))));
+  }
 
   // footer
   sheet.append(h('div.sfoot', {},
     h('button.btn.danger.small', { onclick: () => { closeModal(); undoableAction('Note deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); }); } }, 'Delete'),
+    h('span.screated', { title: fmtFull(n.createdAt) }, 'Created ' + fmtDY(n.createdAt)),
     h('button.btn.small', { onclick: closeModal }, 'Close')));
 
   root.append(h('div.overlay', { onclick: closeModal }), sheet);
@@ -2104,30 +2068,34 @@ async function draftSteps(n, btn, stepsBox, aiNote) {
 function activeHabits() { return STATE.habits.filter(x => !x.archivedAt).sort((a, b) => (a.order || 0) - (b.order || 0)); }
 function retiredHabits() { return STATE.habits.filter(x => x.archivedAt).sort((a, b) => b.archivedAt - a.archivedAt); }
 function todayKey() { return dayKey(Date.now()); }
-function habitCheckedToday(hb) { return !!hb.days[todayKey()]; }
+// A cell cycles blank -> green -> yellow -> red -> blank. Green is the only state that
+// counts as "done" for streaks and hit rate; yellow/red just record that the day was marked.
+const CELL_ORDER = ['green', 'yellow', 'red'];
+function habitCheckedToday(hb) { return hb.days[todayKey()] === 'green'; }
 function keyToTs(k) { return new Date(k + 'T12:00').getTime(); }
 
 function habitStats(hb) {
-  const keys = Object.keys(hb.days).sort();
+  const keys = Object.keys(hb.days).sort();          // every marked day, any color
+  const greenKeys = keys.filter(k => hb.days[k] === 'green');
   const end = startOfDay(hb.archivedAt || Date.now());
   let start = startOfDay(hb.createdAt);
   if (keys.length) start = Math.min(start, startOfDay(keyToTs(keys[0])));
   const totalDays = Math.max(1, Math.round((end - start) / DAY) + 1);
-  const checked = keys.length;
+  const checked = greenKeys.length;
   const pct = Math.round(checked / totalDays * 100);
-  // best streak
+  // best streak, green days only
   let best = 0, run = 0, prev = null;
-  for (const k of keys) {
+  for (const k of greenKeys) {
     const t = startOfDay(keyToTs(k));
     run = (prev !== null && t - prev === DAY) ? run + 1 : 1;
     best = Math.max(best, run);
     prev = t;
   }
-  // current streak: consecutive days ending today (or yesterday if today unchecked)
+  // current streak: consecutive green days ending today (or yesterday if today isn't green)
   let cur = 0;
   let cursor = startOfDay(Date.now());
-  if (!hb.days[dayKey(cursor)]) cursor -= DAY;
-  while (hb.days[dayKey(cursor)]) { cur++; cursor -= DAY; }
+  if (hb.days[dayKey(cursor)] !== 'green') cursor -= DAY;
+  while (hb.days[dayKey(cursor)] === 'green') { cur++; cursor -= DAY; }
   return { totalDays, checked, pct, best, cur, since: start };
 }
 
@@ -2140,8 +2108,13 @@ function lastNDaysKeys(n) {
 
 /* ---------- clean-sweep celebration ---------- */
 let lastSweepDay = null;
+function nextCellColor(cur) {
+  const i = CELL_ORDER.indexOf(cur);
+  return i < 0 ? CELL_ORDER[0] : (i === CELL_ORDER.length - 1 ? null : CELL_ORDER[i + 1]);
+}
 function toggleHabit(hb, dk) {
-  if (hb.days[dk]) delete hb.days[dk]; else hb.days[dk] = 1;
+  const next = nextCellColor(hb.days[dk]);
+  if (next) hb.days[dk] = next; else delete hb.days[dk];
   save();
   renderMeters();
   const habs = activeHabits();
@@ -2195,10 +2168,12 @@ function renderHabitSheet() {
     nameTd.append(nameSpan, tools);
     const tr = h('tr', {}, nameTd);
     for (const k of keys) {
-      const cell = h('button.hcell', { title: hb.name + ' · ' + k, innerHTML: hb.days[k] ? TICK_SVG.replace('stroke-dashoffset:14', '') : '' });
+      const cellTitle = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '');
+      const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: cellTitle() });
       cell.addEventListener('click', () => {
         toggleHabit(hb, k);
-        cell.innerHTML = hb.days[k] ? TICK_SVG : '';
+        cell.className = 'hcell' + (hb.days[k] ? ' c-' + hb.days[k] : '');
+        cell.title = cellTitle();
         const chip = $('.todaychip', box);
         if (chip) chip.textContent = 'Today: ' + activeHabits().filter(habitCheckedToday).length + ' of ' + activeHabits().length;
       });
@@ -2219,7 +2194,7 @@ function renderHabitSheet() {
   tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
   box.append(h('div.hwrap', {}, h('table.htable', {}, thead, tbody)));
-  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to check that day off. The Dashboard tab keeps score.'));
+  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, yellow, or red. Click again to cycle, or a fourth time to clear it. The Dashboard tab keeps score off the green days.'));
   return box;
 }
 
@@ -2235,7 +2210,7 @@ function renderDashboard() {
   // stat tiles
   if (habs.length || ret.length) {
     const possible7 = habs.length * 7;
-    const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k]).length, 0);
+    const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k] === 'green').length, 0);
     const totalChecks = STATE.habits.reduce((a, hb) => a + Object.keys(hb.days).length, 0);
     let bestName = '', bestVal = 0, curBest = 0, curName = '';
     for (const hb of STATE.habits) {
@@ -2294,7 +2269,7 @@ function habCard(hb, retired) {
       + (retired ? ' · retired ' + fmtDY(hb.archivedAt) : ' · streak ' + s.cur + ' (best ' + s.best + ')')));
   if (!retired) {
     const strip = h('div.strip');
-    for (const k of keys) strip.append(h('span.sq' + (hb.days[k] ? '.on' : '') + (k === tk ? '.today' : ''), { title: k + (hb.days[k] ? ' ✓' : '') }));
+    for (const k of keys) strip.append(h('span.sq' + (hb.days[k] ? '.c-' + hb.days[k] : '') + (k === tk ? '.today' : ''), { title: k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '') }));
     card.append(strip);
   }
   return card;
@@ -2310,7 +2285,8 @@ function dashData() {
         name: hb.name, retired: !!hb.archivedAt, since: dayKey(s.since),
         daysTracked: s.totalDays, daysHit: s.checked, hitRatePct: s.pct,
         currentStreak: s.cur, bestStreak: s.best,
-        last14: lastNDaysKeys(14).map(k => hb.days[k] ? '1' : '0').join(''),
+        // last 14 days, one letter per day: G green (done), Y yellow, R red, . blank
+        last14: lastNDaysKeys(14).map(k => ({ green: 'G', yellow: 'Y', red: 'R' }[hb.days[k]] || '.')).join(''),
       };
     }),
     taskGoals: STATE.goals.map(g => ({ name: g.name, target: g.target, period: g.period, progress: goalCount(g) })),
@@ -2321,7 +2297,7 @@ function sampleDashSummary() {
   if (!habs.length) return 'No daily goals tracked yet, so there is nothing to score. Add a few on the Goals page.';
   const last7 = lastNDaysKeys(7);
   const lines = [];
-  const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k]).length, 0);
+  const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k] === 'green').length, 0);
   lines.push('Last 7 days: you hit ' + hit7 + ' of ' + habs.length * 7 + ' possible checks (' + Math.round(hit7 / (habs.length * 7) * 100) + '%).');
   const scored = habs.map(hb => ({ hb, s: habitStats(hb) })).sort((a, b) => b.s.pct - a.s.pct);
   const top = scored[0], low = scored[scored.length - 1];
