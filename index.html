@@ -1,0 +1,2179 @@
+﻿<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dayu</title>
+<style>
+/* ---------- theme tokens ---------- */
+:root{
+  --paper:#F5F2E9; --dots:#DAD4C2; --surface:#FFFFFF; --raise:#FBFAF5;
+  --ink:#17161B; --ink2:#5D5B64; --ink3:#93909B; --line:#E4E0D2; --line2:#D2CDBB;
+  --accent:#2B3FD6; --accent-hover:#1F2FA8; --accent-ink:#FFFFFF; --accent-soft:rgba(43,63,214,.09);
+  --good:#187A48; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08);
+  --shadow:0 1px 2px rgba(23,22,27,.07),0 8px 22px rgba(23,22,27,.11);
+  --shadow-big:0 4px 10px rgba(23,22,27,.10),0 24px 60px rgba(23,22,27,.22);
+  --note-ink:#262212; --note-ink2:rgba(38,34,18,.62);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
+    --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
+    --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
+    --good:#53C98D; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+    --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
+    --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
+  --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
+  --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
+  --good:#53C98D; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+  --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
+  --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
+}
+
+/* ---------- base ---------- */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--paper); color:var(--ink);
+  font-family:"Avenir Next","Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,sans-serif;
+  font-size:14px; line-height:1.45; overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
+
+#app{height:100%;display:flex;flex-direction:column}
+
+/* ---------- top bar ---------- */
+#topbar{
+  flex:0 0 auto; display:flex; align-items:center; gap:18px;
+  height:54px; padding:0 16px; background:var(--surface);
+  border-bottom:1px solid var(--line); position:relative; z-index:40;
+}
+.wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;letter-spacing:-.02em;user-select:none}
+.wordmark .pin{width:20px;height:20px;display:block}
+.tabs{display:flex;gap:2px}
+.tab{
+  padding:6px 12px;border-radius:8px;font-weight:600;color:var(--ink2);
+  text-decoration:none;font-size:13.5px;
+}
+.tab:hover{color:var(--ink);background:var(--accent-soft)}
+.tab.active{color:var(--accent);background:var(--accent-soft)}
+#meters{margin-left:auto;display:flex;align-items:center;gap:14px}
+.meter{display:flex;flex-direction:column;gap:3px;min-width:96px;cursor:pointer;border-radius:6px;padding:2px 4px}
+.meter:hover{background:var(--accent-soft)}
+.meter .mlabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.meter .mrow{display:flex;align-items:center;gap:6px}
+.meter .mtrack{flex:1;height:6px;border-radius:4px;background:var(--line);overflow:hidden}
+.meter .mfill{height:100%;border-radius:4px;background:var(--accent);transition:width .35s cubic-bezier(.2,.8,.2,1)}
+.meter .mnum{font-size:11px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.meter.pulse .mfill{animation:mpulse .5s ease}
+@keyframes mpulse{50%{filter:brightness(1.4)}}
+#menuBtn{width:32px;height:32px;border-radius:8px;font-size:18px;line-height:1;color:var(--ink2)}
+#menuBtn:hover{background:var(--accent-soft);color:var(--ink)}
+#menuPop{
+  position:absolute;top:50px;right:12px;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow-big);padding:6px;min-width:200px;display:none;z-index:60;
+}
+#menuPop.open{display:block}
+#menuPop button{display:block;width:100%;text-align:left;padding:8px 12px;border-radius:8px;font-weight:500}
+#menuPop button:hover{background:var(--accent-soft)}
+#menuPop .sep{height:1px;background:var(--line);margin:5px 8px}
+#menuPop .danger{color:var(--danger)}
+
+/* ---------- pages ---------- */
+main{flex:1;min-height:0;position:relative}
+.page{position:absolute;inset:0;display:none}
+.page.active{display:block}
+.doc{height:100%;overflow-y:auto;padding:32px 20px 80px}
+.doc-inner{max-width:920px;margin:0 auto}
+.doc h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px;text-wrap:balance}
+.doc .sub{color:var(--ink2);margin-bottom:24px}
+
+/* ---------- canvas ---------- */
+#board{position:absolute;inset:0;overflow:auto}
+#field{
+  position:relative;width:2600px;height:1800px;
+  background-image:radial-gradient(var(--dots) 1.2px,transparent 1.2px);
+  background-size:24px 24px;
+}
+#field.drawing{cursor:crosshair}
+.hint{
+  position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
+  color:var(--ink3);font-size:15px;text-align:center;pointer-events:none;user-select:none;
+}
+.hint b{color:var(--ink2)}
+
+/* zones */
+.zone{position:absolute;border-radius:14px;z-index:1}
+.zone .zbg{position:absolute;inset:0;border-radius:14px;opacity:.10;pointer-events:none}
+.zone .zborder{position:absolute;inset:0;border-radius:14px;border:1.5px dashed;opacity:.55;pointer-events:none}
+.zone .zhead{
+  position:absolute;top:-1px;left:10px;transform:translateY(-50%);
+  display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
+  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
+  font-size:12px;font-weight:700;cursor:grab;user-select:none;white-space:nowrap;
+}
+.zone .zhead:active{cursor:grabbing}
+.zone .zcount{font-weight:600;color:var(--ink3);font-variant-numeric:tabular-nums}
+.zone .zdel{width:16px;height:16px;border-radius:50%;font-size:11px;line-height:1;color:var(--ink3);display:none;align-items:center;justify-content:center}
+.zone .zhead:hover .zdel{display:flex}
+.zone .zdel:hover{background:var(--danger-soft);color:var(--danger)}
+.zone .zresize{position:absolute;right:-6px;bottom:-6px;width:16px;height:16px;cursor:nwse-resize;border-radius:4px}
+.zone .zresize::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);border-radius:1px}
+#drawPreview{position:absolute;border:1.5px dashed var(--accent);background:var(--accent-soft);border-radius:14px;z-index:5;display:none;pointer-events:none}
+
+/* notes */
+.note{
+  position:absolute;width:178px;min-height:64px;padding:10px 12px 9px 34px;
+  border-radius:3px 10px 3px 3px;color:var(--note-ink);
+  box-shadow:0 1px 2px rgba(23,22,27,.14),0 5px 12px rgba(23,22,27,.14);
+  cursor:grab;user-select:none;touch-action:none;
+  transition:box-shadow .15s ease, transform .15s ease;
+}
+.note:hover{box-shadow:0 2px 4px rgba(23,22,27,.16),0 10px 22px rgba(23,22,27,.2)}
+.note.dragging{cursor:grabbing;transform:scale(1.04) rotate(-.6deg);box-shadow:0 6px 14px rgba(23,22,27,.2),0 18px 40px rgba(23,22,27,.28);z-index:999}
+.note .chk{
+  position:absolute;left:8px;top:9px;width:19px;height:19px;border-radius:50%;
+  border:2px solid var(--note-ink2);background:rgba(255,255,255,.4);padding:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.note .chk svg{width:11px;height:11px;display:block}
+.note .chk .tickpath{stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:14;stroke-dashoffset:14}
+.note .chk:hover{border-color:var(--note-ink)}
+.note .ntitle{font-size:13.5px;font-weight:600;line-height:1.3;word-wrap:break-word;white-space:pre-wrap}
+.note .ntitle:empty::before{content:"Untitled";opacity:.4}
+.note .nmeta{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10.5px;font-weight:700;color:var(--note-ink2)}
+.note .nmeta:empty{display:none}
+.note .ncat{letter-spacing:.05em;text-transform:uppercase;font-size:9.5px}
+.note .nsteps{font-variant-numeric:tabular-nums}
+.note.done{opacity:.55}
+.note.done .ntitle{text-decoration:line-through;text-decoration-thickness:1.5px}
+.note.done .chk{background:var(--good);border-color:var(--good)}
+.note.done .chk .tickpath{animation:tick .3s ease forwards}
+@keyframes tick{to{stroke-dashoffset:0}}
+.note.flyoff{transition:transform .5s cubic-bezier(.5,0,.9,.4),opacity .5s ease;opacity:0 !important;pointer-events:none}
+.note textarea{
+  width:100%;background:transparent;border:none;resize:none;outline:none;
+  font-size:13.5px;font-weight:600;line-height:1.3;color:var(--note-ink);overflow:hidden;
+}
+.dropchip{
+  position:fixed;z-index:1200;padding:5px 12px;border-radius:999px;background:var(--ink);color:var(--paper);
+  font-size:12px;font-weight:700;pointer-events:none;animation:chipin 1.1s ease forwards;white-space:nowrap;
+}
+@keyframes chipin{0%{opacity:0;transform:translateY(6px)}12%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
+
+/* toolbar */
+#toolbar{
+  position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+  display:flex;gap:4px;padding:5px;border-radius:14px;background:var(--surface);
+  border:1px solid var(--line);box-shadow:var(--shadow-big);z-index:30;
+}
+#toolbar button{
+  display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;
+}
+#toolbar button:hover{background:var(--accent-soft)}
+#toolbar button.primary{background:var(--accent);color:var(--accent-ink)}
+#toolbar button.primary:hover{background:var(--accent-hover)}
+#toolbar button.on{background:var(--ink);color:var(--paper)}
+#toolbar svg{width:15px;height:15px}
+
+/* ---------- shared controls ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;
+  font-weight:700;font-size:13px;border:1px solid var(--line2);background:var(--surface);
+}
+.btn:hover{border-color:var(--ink3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.ghost{border-color:transparent;color:var(--ink2)}
+.btn.ghost:hover{background:var(--accent-soft);color:var(--ink)}
+.btn.danger{color:var(--danger);border-color:transparent}
+.btn.danger:hover{background:var(--danger-soft)}
+.btn.small{padding:4px 10px;font-size:12px;border-radius:7px}
+.input,select.input{
+  padding:7px 11px;border-radius:9px;border:1px solid var(--line2);background:var(--surface);
+  font-size:13.5px;min-width:0;
+}
+.input:focus{outline:2px solid var(--accent);outline-offset:0;border-color:transparent}
+.input::placeholder{color:var(--ink3)}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;
+  border:1px solid var(--line2);font-size:12px;font-weight:700;background:var(--surface);
+}
+.chip .dot{width:8px;height:8px;border-radius:50%}
+.chip:hover{border-color:var(--ink3)}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.label{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink3)}
+
+/* ---------- modal ---------- */
+#modalRoot{position:fixed;inset:0;z-index:100;display:none}
+#modalRoot.open{display:block}
+.overlay{position:absolute;inset:0;background:rgba(23,22,27,.35);animation:fadein .15s ease}
+@keyframes fadein{from{opacity:0}}
+.sheet{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:min(560px,calc(100vw - 32px));max-height:min(680px,calc(100vh - 48px));
+  background:var(--surface);border-radius:16px;box-shadow:var(--shadow-big);
+  display:flex;flex-direction:column;overflow:hidden;animation:sheetin .18s cubic-bezier(.2,.9,.3,1.2);
+}
+@keyframes sheetin{from{opacity:0;transform:translate(-50%,-48%) scale(.96)}}
+.sheet .ctab{height:6px;flex:0 0 auto}
+.sheet .sbody{padding:20px 24px 22px;overflow-y:auto}
+.sheet .srow{display:flex;align-items:flex-start;gap:12px}
+.sheet .bigchk{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:2.5px solid var(--line2);margin-top:4px;display:flex;align-items:center;justify-content:center;padding:0}
+.sheet .bigchk:hover{border-color:var(--good)}
+.sheet .bigchk.done{background:var(--good);border-color:var(--good)}
+.sheet .bigchk svg{width:13px;height:13px}
+.sheet .bigchk .tickpath{stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.sheet .ttl{
+  flex:1;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
+  font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.25;
+}
+.sheet .desc{
+  width:100%;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
+  color:var(--ink2);font-size:13.5px;margin:6px 0 0 38px;max-width:calc(100% - 38px);
+}
+.sheet .sec{margin-top:20px}
+.sheet .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.steps{display:flex;flex-direction:column;gap:2px}
+.step{display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:8px}
+.step:hover{background:var(--accent-soft)}
+.step .schk{flex:0 0 auto;width:17px;height:17px;border-radius:50%;border:2px solid var(--line2);padding:0;display:flex;align-items:center;justify-content:center}
+.step .schk.done{background:var(--good);border-color:var(--good)}
+.step .schk svg{width:9px;height:9px}
+.step .schk .tickpath{stroke:#fff;stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.step input[type=text]{flex:1;border:none;outline:none;background:transparent;font-size:13.5px}
+.step.done input[type=text]{text-decoration:line-through;color:var(--ink3)}
+.step .sdel{color:var(--ink3);font-size:14px;width:22px;height:22px;border-radius:6px;visibility:hidden}
+.step:hover .sdel{visibility:visible}
+.step .sdel:hover{color:var(--danger);background:var(--danger-soft)}
+.addstep{display:flex;gap:9px;align-items:center;padding:5px 6px}
+.addstep .plus{color:var(--ink3);width:17px;text-align:center;font-weight:700}
+.addstep input{flex:1;border:none;outline:none;background:transparent;font-size:13.5px}
+.ainote{margin-top:8px;font-size:11.5px;color:var(--ink3);font-style:italic}
+.catpick{display:flex;flex-wrap:wrap;gap:6px}
+.newcat{display:flex;gap:6px;margin-top:8px}
+.meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
+.meta .mitem{display:flex;flex-direction:column;gap:2px}
+.meta .mval{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.sfoot{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:var(--raise)}
+
+/* ---------- archive ---------- */
+.filters{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:18px}
+.filters .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.filters .grow{flex:1;min-width:180px}
+.count{color:var(--ink2);font-size:13px;margin-bottom:12px}
+.alist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.acard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.acard .atop{display:flex;align-items:flex-start;gap:8px}
+.acard .atick{flex:0 0 auto;width:18px;height:18px;border-radius:50%;background:var(--good);display:flex;align-items:center;justify-content:center;margin-top:1px}
+.acard .atick svg{width:9px;height:9px}
+.acard .atitle{font-weight:700;font-size:14px;line-height:1.3;flex:1}
+.acard .adates{font-size:12px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.acard .abot{display:flex;align-items:center;gap:8px;margin-top:2px}
+.acard .spacer{flex:1}
+.minichip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.minichip .dot{width:7px;height:7px;border-radius:50%}
+.aisec{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
+.aisec .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.aiout{margin-top:14px;padding:14px 16px;border-radius:10px;background:var(--raise);border:1px solid var(--line);white-space:pre-wrap;font-size:13.5px;display:none}
+.aiout.show{display:block}
+
+/* prompts modal list */
+.plist{display:flex;flex-direction:column;gap:8px}
+.pitem{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.pitem .phead{display:flex;align-items:center;gap:8px}
+.pitem .pname{font-weight:700;flex:1}
+.pitem .ptext{color:var(--ink2);font-size:12.5px;margin-top:4px}
+.pedit{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.pedit textarea{min-height:60px;resize:vertical}
+
+/* ---------- goals ---------- */
+.gsplit{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+@media (max-width:760px){.gsplit{grid-template-columns:1fr}}
+.gcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.gcard .ghead{display:flex;align-items:center;gap:8px}
+.gcard .gname{font-weight:700;flex:1}
+.gcard .gmeta{font-size:12px;color:var(--ink2);margin-top:2px}
+.gcard .gbar{display:flex;align-items:center;gap:10px;margin-top:10px}
+.gcard .gtrack{flex:1;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.gcard .gfill{height:100%;border-radius:4px;background:var(--accent);transition:width .35s cubic-bezier(.2,.8,.2,1)}
+.gcard .gfill.full{background:var(--good)}
+.gcard .gnum{font-weight:800;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.gcard.donegoal{border-color:var(--good)}
+.gdone-tag{display:inline-flex;align-items:center;gap:5px;color:var(--good);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.pinbtn{width:26px;height:26px;border-radius:7px;color:var(--ink3);display:flex;align-items:center;justify-content:center}
+.pinbtn:hover{background:var(--accent-soft)}
+.pinbtn.on{color:var(--accent)}
+.xbtn{width:26px;height:26px;border-radius:7px;color:var(--ink3);font-size:15px}
+.xbtn:hover{color:var(--danger);background:var(--danger-soft)}
+.newform{background:var(--surface);border:1px dashed var(--line2);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.newform .frow{display:flex;gap:8px;flex-wrap:wrap}
+.wish-state{font-size:12px;font-weight:700}
+.wish-state.locked{color:var(--ink3)}
+.wish-state.unlocked{color:var(--accent)}
+.claimed .gname{text-decoration:line-through;color:var(--ink3)}
+
+/* ---------- toast / misc ---------- */
+#toastRoot{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{
+  display:flex;align-items:center;gap:14px;padding:10px 16px;border-radius:12px;
+  background:var(--ink);color:var(--paper);font-weight:600;font-size:13px;box-shadow:var(--shadow-big);
+  animation:toastin .2s cubic-bezier(.2,.9,.3,1.2);max-width:min(480px,90vw);
+}
+@keyframes toastin{from{opacity:0;transform:translateY(10px)}}
+.toast button{color:inherit;font-weight:800;text-decoration:underline;text-underline-offset:3px;flex:0 0 auto}
+.toast .tmsg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#storageNote{
+  position:fixed;left:16px;bottom:16px;z-index:250;max-width:280px;display:none;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-big);
+  padding:12px 14px;font-size:12.5px;color:var(--ink2);
+}
+#storageNote b{color:var(--ink)}
+#storageNote button{float:right;color:var(--ink3);font-size:14px;margin:-4px -6px 0 6px}
+.confetto{position:fixed;width:8px;height:8px;z-index:400;pointer-events:none;animation:confall .9s ease-in forwards}
+@keyframes confall{to{transform:translateY(120px) rotate(340deg);opacity:0}}
+.zonepop{
+  position:absolute;z-index:50;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow-big);padding:12px;display:flex;flex-direction:column;gap:9px;width:230px;
+}
+.zonepop .dots{display:flex;gap:7px}
+.zonepop .cdot{width:22px;height:22px;border-radius:50%;border:2px solid transparent;padding:0}
+.zonepop .cdot.on{border-color:var(--ink)}
+.empty{color:var(--ink3);text-align:center;padding:40px 20px;font-size:14px}
+
+/* ---------- notice bar & sync chip ---------- */
+#noticeBar{flex:0 0 auto;display:flex;flex-direction:column;z-index:35}
+.notice{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12.5px;font-weight:600;background:var(--danger-soft);border-bottom:1px solid var(--line)}
+.notice .nico{color:var(--danger);flex:0 0 auto}
+.notice .ntext{flex:1}
+.notice .ndis{color:var(--ink3);font-size:14px;flex:0 0 auto}
+.notice .ndis:hover{color:var(--ink)}
+#syncChip{display:none;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;border:1px solid var(--line2);font-size:11.5px;font-weight:700;color:var(--ink2);white-space:nowrap}
+#syncChip.show{display:inline-flex}
+#syncChip:hover{border-color:var(--ink3)}
+#syncChip .sdot{width:7px;height:7px;border-radius:50%;background:var(--ink3);flex:0 0 auto}
+#syncChip.ok .sdot{background:var(--good)}
+#syncChip.err .sdot{background:var(--danger)}
+#syncChip.busy .sdot{background:var(--accent);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* ---------- daily-goal sheet ---------- */
+.hsheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.hwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:22px}
+table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620px}
+.htable th,.htable td{border-bottom:1px solid var(--line);padding:0;text-align:center}
+.htable tr:last-child td{border-bottom:none}
+.htable thead th{padding:8px 3px 6px;font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
+.htable thead th .dnum{display:block;font-size:12px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+.htable th.hname,.htable td.hname{position:sticky;left:0;background:var(--surface);text-align:left;padding:8px 12px;min-width:160px;max-width:230px;z-index:2}
+.htable td.hname{font-weight:600;font-size:13px}
+.htable td.hname .htools{visibility:hidden;display:inline-flex;gap:2px;margin-left:6px;vertical-align:middle}
+.htable tr:hover td.hname .htools{visibility:visible}
+.htable .htools button{width:20px;height:20px;border-radius:5px;color:var(--ink3);font-size:11px;line-height:1}
+.htable .htools button:hover{background:var(--accent-soft);color:var(--ink)}
+.htable .todaycol{background:var(--accent-soft)}
+.hcell{width:36px;height:36px;padding:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center}
+.hcell svg{width:13px;height:13px}
+.hcell .tickpath{stroke:var(--accent);stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.hcell:hover{background:var(--accent-soft)}
+.htable td.hname input{width:100%;border:none;outline:none;background:transparent;font:inherit}
+.haddrow input{width:100%;border:none;outline:none;background:transparent;padding:10px 12px;font-size:13px}
+.todaychip{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+
+/* ---------- dashboard ---------- */
+.statrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat .snum{font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .snum small{font-size:14px;font-weight:700;color:var(--ink2)}
+.stat .slab{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin-top:2px}
+.hab{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.hab .hhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.hab .hnamebig{font-weight:700;font-size:14.5px;flex:1;min-width:120px}
+.hab .hpct{font-weight:800;font-size:18px;font-variant-numeric:tabular-nums}
+.hab .hmeta{font-size:12px;color:var(--ink2);margin-top:2px}
+.hab .strip{display:flex;gap:3px;margin-top:10px;flex-wrap:wrap}
+.sq{width:12px;height:12px;border-radius:3px;background:var(--line)}
+.sq.on{background:var(--accent)}
+.sq.today{outline:2px solid var(--accent);outline-offset:1px}
+.hab.retired{opacity:.8}
+.dsec{margin-top:26px}
+.dsec>.label{display:block;margin-bottom:10px}
+.minigoal{display:flex;align-items:center;gap:10px;padding:7px 0}
+.minigoal .mgname{flex:1;font-weight:600;font-size:13px}
+.minigoal .gtrack{flex:2;height:7px;border-radius:4px;background:var(--line);overflow:hidden}
+.minigoal .gnum{font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- settings ---------- */
+.setsec{margin-bottom:22px}
+.setsec .frow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.setsec .grow{flex:1;min-width:170px}
+.setnote{font-size:11.5px;color:var(--ink3);margin-top:7px;line-height:1.5}
+.okline{font-size:12.5px;font-weight:700;color:var(--good)}
+.errline{font-size:12.5px;font-weight:700;color:var(--danger)}
+@media (max-width:720px){
+  .tabs .tab{padding:6px 8px}
+  #meters .meter{min-width:64px}
+  .meter .mlabel{max-width:70px}
+}
+</style>
+
+<div id="app">
+  <header id="topbar">
+    <div class="wordmark">
+      <svg class="pin" viewBox="0 0 24 24" aria-hidden="true"><g transform="rotate(38 12 12)"><path d="M12 3c-2.6 0-4.4 1.6-4.4 3.9 0 1.5.8 2.6 1.9 3.2l-.9 4.4h6.8l-.9-4.4c1.1-.6 1.9-1.7 1.9-3.2C16.4 4.6 14.6 3 12 3z" fill="var(--accent)"/><rect x="11.2" y="14.2" width="1.6" height="6.6" rx=".8" fill="var(--accent)"/></g></svg>
+      <span>Dayu</span>
+    </div>
+    <nav class="tabs">
+      <a class="tab" href="#canvas" data-page="canvas">Canvas</a>
+      <a class="tab" href="#archive" data-page="archive">Archive</a>
+      <a class="tab" href="#goals" data-page="goals">Goals</a>
+      <a class="tab" href="#dashboard" data-page="dashboard">Dashboard</a>
+    </nav>
+    <div id="meters" title="Progress today. Click to manage goals"></div>
+    <button id="syncChip" title="Sync status"><span class="sdot"></span><span class="stext">Local</span></button>
+    <button id="menuBtn" aria-label="Menu" aria-haspopup="true">⋯</button>
+    <div id="menuPop" role="menu">
+      <button id="mSettings">AI &amp; sync settings</button>
+      <div class="sep"></div>
+      <button id="mExport">Export backup (.json)</button>
+      <button id="mImport">Import backup…</button>
+      <div class="sep"></div>
+      <button id="mReset" class="danger">Clear everything</button>
+    </div>
+  </header>
+
+  <div id="noticeBar"></div>
+
+  <main>
+    <section class="page active" id="pg-canvas">
+      <div id="board">
+        <div id="field">
+          <div id="drawPreview"></div>
+        </div>
+      </div>
+      <div id="toolbar">
+        <button id="btnNote" class="primary" title="Add a note (or double-click the canvas)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Note
+        </button>
+        <button id="btnZone" title="Draw a cluster area, then drop notes into it">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.5 3" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="3"/></svg>
+          Cluster
+        </button>
+      </div>
+    </section>
+
+    <section class="page" id="pg-archive">
+      <div class="doc"><div class="doc-inner" id="archiveInner"></div></div>
+    </section>
+
+    <section class="page" id="pg-goals">
+      <div class="doc"><div class="doc-inner" id="goalsInner"></div></div>
+    </section>
+
+    <section class="page" id="pg-dashboard">
+      <div class="doc"><div class="doc-inner" id="dashInner"></div></div>
+    </section>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+<div id="storageNote"></div>
+<input type="file" id="importFile" accept=".json,application/json" style="display:none">
+
+<script>
+'use strict';
+/* ================= Tack — core ================= */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id' + Math.random().toString(36).slice(2) + Date.now());
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = s => String(s == null ? '' : s);
+
+// dom builder: h('div.cls', {attrs/on*}, children...)
+function h(spec, props, ...kids) {
+  const [tag, ...classes] = spec.split('.');
+  const el = document.createElement(tag || 'div');
+  if (classes.length) el.className = classes.join(' ');
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'style') Object.assign(el.style, v);
+    else if (k === 'dataset') Object.assign(el.dataset, v);
+    else if (k in el && k !== 'list') { try { el[k] = v; } catch (e) { el.setAttribute(k, v); } }
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  }
+  return el;
+}
+const TICK_SVG = '<svg viewBox="0 0 14 14" aria-hidden="true"><path class="tickpath" d="M2.5 7.5l3 3 6-7"/></svg>';
+
+/* ---------- sticky palette (fixed, not themed — stickies are physical) ---------- */
+const PAL = [
+  { id: 'yellow', name: 'Lemon',  bg: '#FFE97D', deep: '#7A6000' },
+  { id: 'rose',   name: 'Rose',   bg: '#FFC9D4', deep: '#96324B' },
+  { id: 'peach',  name: 'Peach',  bg: '#FFD8AC', deep: '#8F520D' },
+  { id: 'mint',   name: 'Mint',   bg: '#BEE9C8', deep: '#1D663F' },
+  { id: 'sky',    name: 'Sky',    bg: '#BDDFFF', deep: '#1B5795' },
+  { id: 'lilac',  name: 'Lilac',  bg: '#DCCEFF', deep: '#5F3BA1' },
+];
+const palById = id => PAL.find(p => p.id === id) || PAL[0];
+const DEFAULT_NOTE_BG = PAL[0].bg;
+
+/* ---------- dates ---------- */
+const DAY = 86400000;
+const fmtD = ts => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+const fmtDY = ts => new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtFull = ts => new Date(ts).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+function dayKey(ts) { const d = new Date(ts); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function startOfDay(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function startOfWeek(ts) { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.getTime(); } // Monday
+function inPeriod(ts, period) {
+  const now = Date.now();
+  if (period === 'day') return startOfDay(ts) === startOfDay(now);
+  if (period === 'week') return ts >= startOfWeek(now);
+  if (period === 'month') { const a = new Date(ts), b = new Date(now); return a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear(); }
+  return true;
+}
+const PERIOD_LABEL = { day: 'today', week: 'this week', month: 'this month', all: 'all-time' };
+
+/* ---------- storage adapter ---------- */
+const STORE_KEY = 'dayu-state-v1';
+const LEGACY_STORE_KEY = 'tack-state-v1';
+let storageOK = true;
+const memStore = {};
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { storageOK = false; return memStore[k] || null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { storageOK = false; memStore[k] = v; } }
+
+/* ---------- state ---------- */
+let STATE = null;
+let saveTimer = null;
+function save() {
+  if (STATE.meta) STATE.meta.updatedAt = Date.now();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => storeSet(STORE_KEY, JSON.stringify(STATE)), 250);
+  schedulePush();
+}
+function blankState() {
+  return { v: 2, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10, meta: { updatedAt: Date.now() } };
+}
+function dashPromptSeeds() {
+  return [
+    { id: uid(), scope: 'dashboard', name: 'What could be better?', text: 'Look at my daily goal tracking. Tell me directly what could be improved: which goals slip most, which days are weak, and one concrete change to try. No fluff.' },
+    { id: uid(), scope: 'dashboard', name: 'Pep talk', text: 'Review my goal tracking and give me a short, honest pep talk: call out real wins and streaks, then one nudge for tomorrow.' },
+  ];
+}
+function migrate(s) {
+  if (!s.meta) s.meta = { updatedAt: Date.now() };
+  if (!Array.isArray(s.habits)) s.habits = [];
+  for (const p of s.prompts) if (!p.scope) p.scope = 'archive';
+  if ((s.v || 1) < 2) {
+    s.prompts.push(...dashPromptSeeds());
+    s.v = 2;
+  }
+  return s;
+}
+function seedState() {
+  const s = blankState();
+  const now = Date.now();
+  const catStart = { id: uid(), name: 'Getting started', color: 'sky' };
+  s.cats.push(catStart);
+  s.zones.push({ id: uid(), catId: catStart.id, x: 620, y: 90, w: 340, h: 300 });
+  const mk = (title, x, y, extra) => Object.assign({
+    id: uid(), title, desc: '', x, y, catId: null,
+    createdAt: now, completedAt: null, archived: false, steps: [], z: ++s.zTop,
+  }, extra || {});
+  s.notes.push(
+    mk('Drag me anywhere. Make a mess, then make it make sense', 120, 120),
+    mk('Drop me into the cluster on the right →', 350, 250, {}),
+    mk('Click me (don’t drag) to open the big view, then try “Draft steps”', 140, 330),
+    mk('Check my circle when you’re done with me, and watch the bar up top', 380, 430),
+    mk('I live here, so my category is “Getting started”', 660, 150, { catId: catStart.id }),
+    mk('Draw your own cluster with the Cluster button below', 690, 280, { catId: catStart.id }),
+  );
+  s.goals.push({ id: uid(), name: 'Warm-up: clear 3 tasks', target: 3, period: 'week', catId: null, pinned: true, createdAt: now });
+  s.wishes.push({ id: uid(), text: 'A fancy coffee, on me', goalId: s.goals[0].id, claimedAt: null, createdAt: now });
+  s.prompts.push(
+    { id: uid(), scope: 'archive', name: 'Weekly recap', text: 'Summarize what I completed, grouped by category. Keep it brief and encouraging.' },
+    { id: uid(), scope: 'archive', name: 'Find patterns', text: 'Look at my completed tasks and point out patterns: which categories dominate, what I finish fastest, and one suggestion for next week.' },
+    ...dashPromptSeeds(),
+  );
+  s.habits.push(
+    { id: uid(), name: 'Stretch for five minutes', order: 1, createdAt: now, archivedAt: null, days: {} },
+    { id: uid(), name: 'Read 10 pages', order: 2, createdAt: now, archivedAt: null, days: {} },
+  );
+  return s;
+}
+function loadState() {
+  const raw = storeGet(STORE_KEY) || storeGet(LEGACY_STORE_KEY);
+  if (raw) {
+    try { const s = JSON.parse(raw); if (s && Array.isArray(s.notes)) return migrate(s); } catch (e) { /* fall through */ }
+  }
+  return seedState();
+}
+
+/* ---------- undo / toast ---------- */
+let toastTimer = null;
+function toast(msg, undoFn, ms) {
+  const root = $('#toastRoot');
+  root.innerHTML = '';
+  const t = h('div.toast', {}, h('span.tmsg', {}, msg));
+  if (undoFn) t.append(h('button', { onclick: () => { root.innerHTML = ''; clearTimeout(toastTimer); undoFn(); } }, 'Undo'));
+  root.append(t);
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { root.innerHTML = ''; }, ms || (undoFn ? 6000 : 2600));
+}
+function snapshot() { return JSON.stringify(STATE); }
+function restore(snap) { STATE = JSON.parse(snap); save(); renderAll(); }
+function undoableAction(msg, mutate) {
+  const snap = snapshot();
+  mutate();
+  save(); renderAll();
+  toast(msg, () => restore(snap));
+}
+
+/* ---------- gamification helpers ---------- */
+function completedNotes() { return STATE.notes.filter(n => n.completedAt); }
+function goalCount(g) {
+  return completedNotes().filter(n => inPeriod(n.completedAt, g.period) && (!g.catId || n.catId === g.catId)).length;
+}
+function goalMet(g) { return goalCount(g) >= g.target; }
+function confetti(x, y) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const colors = PAL.map(p => p.bg).concat(['#2B3FD6']);
+  for (let i = 0; i < 22; i++) {
+    const c = h('div.confetto', {
+      style: {
+        left: (x + (Math.random() * 120 - 60)) + 'px', top: (y + (Math.random() * 30 - 15)) + 'px',
+        background: colors[i % colors.length],
+        borderRadius: Math.random() > .5 ? '50%' : '2px',
+        animationDelay: (Math.random() * .18) + 's',
+        transform: 'rotate(' + Math.random() * 180 + 'deg)',
+      },
+    });
+    document.body.append(c);
+    setTimeout(() => c.remove(), 1300);
+  }
+}
+// called after any completion change: pulse meters, celebrate newly met goals
+let metBefore = {};
+function completionChanged() {
+  renderMeters(true);
+  for (const g of STATE.goals) {
+    const met = goalMet(g);
+    if (met && !metBefore[g.id]) {
+      const mrect = $('#meters').getBoundingClientRect();
+      confetti(mrect.left + mrect.width / 2 || innerWidth - 160, mrect.bottom + 10 || 60);
+      toast('Goal reached: ' + g.name + ' 🎉', null, 3500);
+    }
+    metBefore[g.id] = met;
+  }
+}
+
+/* ---------- meters (top-right pinned goals) ---------- */
+function renderMeters(pulse) {
+  const box = $('#meters');
+  box.innerHTML = '';
+  const habs = activeHabits();
+  if (habs.length) {
+    const done = habs.filter(habitCheckedToday).length, pct = clamp(done / habs.length * 100, 0, 100);
+    box.append(h('div.meter' + (pulse ? '.pulse' : ''), { onclick: () => go('goals'), title: 'Daily goals checked today. Click to open' },
+      h('div.mlabel', {}, 'Daily'),
+      h('div.mrow', {},
+        h('div.mtrack', {}, h('div.mfill', { style: { width: pct + '%', background: done >= habs.length ? 'var(--good)' : 'var(--accent)' } })),
+        h('span.mnum', {}, done + '/' + habs.length))));
+  }
+  const pinned = STATE.goals.filter(g => g.pinned).slice(0, Math.max(1, 3 - (habs.length ? 1 : 0)));
+  if (!pinned.length && !habs.length) {
+    const today = completedNotes().filter(n => inPeriod(n.completedAt, 'day')).length;
+    box.append(h('div.meter', { onclick: () => go('goals'), title: 'Completed today. Click to set goals' },
+      h('div.mlabel', {}, 'Today'),
+      h('div.mrow', {}, h('span.mnum', {}, '✓ ' + today + ' done'))));
+    return;
+  }
+  for (const g of pinned) {
+    const n = goalCount(g), pct = clamp(n / g.target * 100, 0, 100);
+    const m = h('div.meter' + (pulse ? '.pulse' : ''), { onclick: () => go('goals'), title: g.name + ' · ' + PERIOD_LABEL[g.period] },
+      h('div.mlabel', {}, g.name),
+      h('div.mrow', {},
+        h('div.mtrack', {}, h('div.mfill', { style: { width: pct + '%', background: n >= g.target ? 'var(--good)' : 'var(--accent)' } })),
+        h('span.mnum', {}, n + '/' + g.target)));
+    box.append(m);
+  }
+}
+
+/* ---------- router (click-driven; the URL hash is a nice-to-have) ---------- */
+let pageName = 'canvas';
+function currentPage() { return pageName; }
+function go(pg) {
+  pageName = ['canvas', 'archive', 'goals', 'dashboard'].includes(pg) ? pg : 'canvas';
+  try { if (location.hash !== '#' + pageName) history.replaceState(null, '', '#' + pageName); } catch (e) { /* data:/sandboxed pages */ }
+  $$('.page').forEach(p => p.classList.toggle('active', p.id === 'pg-' + pageName));
+  $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === pageName));
+  if (pageName === 'archive') renderArchive();
+  if (pageName === 'goals') renderGoals();
+  if (pageName === 'dashboard') renderDashboard();
+}
+function route() { go((location.hash || '#canvas').slice(1)); }
+function wireTabs() {
+  $$('.tab').forEach(t => t.addEventListener('click', e => { e.preventDefault(); go(t.dataset.page); }));
+}
+function renderAll() { renderMeters(); renderCanvas(); go(pageName); }
+
+/* ---------- menu: export / import / reset ---------- */
+async function exportBackup() {
+  const data = JSON.stringify(STATE, null, 2);
+  const filename = 'dayu-backup-' + dayKey(Date.now()) + '.json';
+  try {
+    const dl = window.claude && claude.use ? await claude.use('downloads') : null;
+    if (dl) { await dl.save({ filename, data }); toast('Backup saved'); return; }
+  } catch (err) {
+    if (err && err.code === 'declined') return;
+    if (err && err.code === 'rate_limited') { toast('One download at a time. Try again in a moment'); return; }
+    // fall through to anchor download
+  }
+  try {
+    const a = h('a', { href: URL.createObjectURL(new Blob([data], { type: 'application/json' })), download: filename });
+    document.body.append(a); a.click(); a.remove();
+    toast('Backup downloaded');
+  } catch (e) { toast('Couldn’t save a backup in this environment'); }
+}
+function importBackup(file) {
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const s = JSON.parse(rd.result);
+      if (!s || !Array.isArray(s.notes)) throw new Error('bad shape');
+      const snap = snapshot();
+      STATE = migrate(s); save(); renderAll();
+      toast('Backup imported', () => restore(snap));
+    } catch (e) { toast('That file doesn’t look like a Dayu backup'); }
+  };
+  rd.readAsText(file);
+}
+function wireMenu() {
+  const pop = $('#menuPop');
+  $('#menuBtn').addEventListener('click', e => { e.stopPropagation(); pop.classList.toggle('open'); });
+  document.addEventListener('click', e => { if (!pop.contains(e.target)) pop.classList.remove('open'); });
+  $('#mSettings').addEventListener('click', () => { pop.classList.remove('open'); openSettings(); });
+  $('#syncChip').addEventListener('click', openSettings);
+  $('#mExport').addEventListener('click', () => { pop.classList.remove('open'); exportBackup(); });
+  $('#mImport').addEventListener('click', () => { pop.classList.remove('open'); $('#importFile').click(); });
+  $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
+  $('#mReset').addEventListener('click', () => {
+    pop.classList.remove('open');
+    undoableAction('Board cleared', () => { STATE = blankState(); });
+  });
+}
+
+'use strict';
+/* ================= Tack — services: config, notices, Google AI, Supabase sync ================= */
+
+/* ---------- config (kept in this browser only, never synced) ---------- */
+const CFG_KEY = 'dayu-cfg-v1';
+// Baked-in defaults so visitors need zero setup. The publishable key is public by design;
+// row level security keeps each account's data private.
+const SB_DEFAULTS = {
+  url: 'https://pzpaogsadtjmefiuhauy.supabase.co',
+  anon: 'sb_publishable_Uvg27Wf778Lk0aGWUOXIiA_dLHrQvOt',
+};
+let CFG = { gemKey: '', gemModel: 'gemini-flash-latest', sbUrl: '', sbAnon: '', sbEmail: '', sbRefresh: '', lastUserId: '', lastSyncAt: 0 };
+(function loadCfg() {
+  try { const raw = storeGet(CFG_KEY) || storeGet('tack-cfg-v1'); if (raw) Object.assign(CFG, JSON.parse(raw)); } catch (e) { /* fresh */ }
+  if (!CFG.sbUrl && SB_DEFAULTS.url) CFG.sbUrl = SB_DEFAULTS.url;
+  if (!CFG.sbAnon && SB_DEFAULTS.anon) CFG.sbAnon = SB_DEFAULTS.anon;
+  if (/^gemini-2\./.test(CFG.gemModel || '')) CFG.gemModel = 'gemini-flash-latest'; // retired for new accounts
+})();
+function saveCfg() { storeSet(CFG_KEY, JSON.stringify(CFG)); }
+function aiConfigured() { return !!CFG.gemKey; }
+
+/* ---------- notice bar (persistent in-app notifications) ---------- */
+function showNotice(id, msg) {
+  const bar = $('#noticeBar');
+  let n = $('.notice[data-id="' + id + '"]', bar);
+  if (n) { $('.ntext', n).textContent = msg; return; }
+  n = h('div.notice', { dataset: { id } },
+    h('span.nico', {}, '⚠'),
+    h('span.ntext', {}, msg),
+    h('button.ndis', { title: 'Dismiss', onclick: () => n.remove() }, '✕'));
+  bar.append(n);
+}
+function clearNotice(id) { const n = $('.notice[data-id="' + id + '"]'); if (n) n.remove(); }
+
+/* ---------- Google AI (Gemini via AI Studio key) ---------- */
+const GEM_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
+async function gemini(prompt) {
+  if (!CFG.gemKey) throw { code: 'nokey' };
+  const model = CFG.gemModel || 'gemini-flash-latest';
+  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } };
+  let r;
+  try {
+    r = await fetch(GEM_BASE + encodeURIComponent(model) + ':generateContent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': CFG.gemKey },
+      body: JSON.stringify(body),
+    });
+  } catch (e) { throw { code: 'net' }; }
+  if (r.status === 429) {
+    showNotice('gem-quota', 'Google AI usage limit reached. Free-tier limits reset roughly once a day; try again later, or switch to Flash-Lite in Settings for higher limits.');
+    toast('Google AI limit hit');
+    throw { code: 'quota' };
+  }
+  if (r.status === 400 || r.status === 401 || r.status === 403) {
+    let msg = '';
+    try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* ignore */ }
+    if (/api key/i.test(msg) || r.status === 401 || r.status === 403) {
+      showNotice('gem-key', 'Google AI rejected the API key. Check it in Settings (⋯ menu).');
+      throw { code: 'key' };
+    }
+    throw { code: 'bad', msg };
+  }
+  if (r.status === 503) throw { code: 'busy' };
+  if (!r.ok) throw { code: 'http' + r.status };
+  const j = await r.json();
+  let text = '';
+  try { text = j.candidates[0].content.parts.map(p => p.text || '').join(''); } catch (e) { /* empty */ }
+  if (!text.trim()) throw { code: 'empty' };
+  clearNotice('gem-key'); clearNotice('gem-quota');
+  return text.trim();
+}
+function aiFailNote(err) {
+  const c = err && err.code;
+  if (c === 'quota') return 'Google AI limit reached, so this is the locally computed fallback.';
+  if (c === 'key') return 'Google AI key was rejected (see Settings), so this is the locally computed fallback.';
+  if (c === 'busy') return 'Google AI is overloaded right now, so this is the locally computed fallback.';
+  if (c === 'net') return storageOK
+    ? 'Couldn’t reach Google AI (offline?), so this is the locally computed fallback.'
+    : 'This preview page can’t reach the internet. AI works when Dayu runs locally or on its own hosting.';
+  return 'AI error (' + (c || '?') + '), so this is the locally computed fallback.';
+}
+// shared: run a prompt preset over a data object, with local fallback
+async function summarize(p, data, sampleFn) {
+  if (aiConfigured()) {
+    try {
+      return await gemini((p ? p.text : 'Summarize this.') + '\n\nDATA (JSON):\n' + JSON.stringify(data)
+        + '\n\nReply in plain text under 200 words. No markdown formatting, no headers. Never use em dashes.');
+    } catch (err) { return sampleFn() + '\n\n' + aiFailNote(err); }
+  }
+  return sampleFn() + '\n\nSample summary, computed locally. Add your Google AI Studio key in Settings (⋯ menu) to use your saved prompts for real.';
+}
+
+/* ---------- Supabase (plain REST, no library) ---------- */
+const SB = { access: null, lastPull: 0, status: 'local', detail: '', pushTimer: null };
+function sbConfigured() { return !!(CFG.sbUrl && CFG.sbAnon); }
+function syncStatus(status, detail) {
+  SB.status = status; SB.detail = detail || '';
+  const chip = $('#syncChip');
+  if (!chip) return;
+  chip.classList.toggle('show', sbConfigured());
+  chip.classList.remove('ok', 'err', 'busy');
+  const map = { local: 'Local', signin: 'Sign in', busy: 'Syncing…', ok: 'Synced', off: 'Offline', err: 'Sync error' };
+  $('.stext', chip).textContent = map[status] || status;
+  if (status === 'ok') chip.classList.add('ok');
+  if (status === 'err' || status === 'signin') chip.classList.add('err');
+  if (status === 'busy') chip.classList.add('busy');
+  chip.title = detail || ('Sync: ' + (map[status] || status) + (CFG.lastSyncAt ? '. Last synced ' + new Date(CFG.lastSyncAt).toLocaleTimeString() : ''));
+}
+async function sbFetch(path, opts, allowRetry) {
+  const headers = Object.assign(
+    { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
+    SB.access ? { Authorization: 'Bearer ' + SB.access } : {},
+    (opts && opts.headers) || {});
+  const r = await fetch(CFG.sbUrl + path, Object.assign({}, opts, { headers }));
+  if (r.status === 401 && allowRetry !== false && CFG.sbRefresh) {
+    const ok = await sbRefreshToken();
+    if (ok) return sbFetch(path, opts, false);
+  }
+  return r;
+}
+function b64url(bytes) { return btoa(String.fromCharCode.apply(null, Array.from(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function jwtPayload(tok) {
+  try { return JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return null; }
+}
+// Adopt a session. If a DIFFERENT account signs in on this browser, never push the
+// previous person's local board into it: reset local to a seed that any remote copy outranks.
+function applySession(access, refresh) {
+  SB.access = access || null;
+  CFG.sbRefresh = refresh || '';
+  const p = jwtPayload(access) || {};
+  CFG.sbEmail = p.email || CFG.sbEmail || '';
+  const uidNew = p.sub || '';
+  if (uidNew && CFG.lastUserId && CFG.lastUserId !== uidNew) {
+    STATE = seedState();
+    STATE.meta.updatedAt = 1;
+    storeSet(STORE_KEY, JSON.stringify(STATE));
+    renderAll();
+  }
+  if (uidNew) CFG.lastUserId = uidNew;
+  saveCfg();
+  clearNotice('sb-signin');
+}
+async function sbSignIn(email, pass) {
+  const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=password', {
+    method: 'POST',
+    headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: pass }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error_description || j.msg || ('Sign-in failed (HTTP ' + r.status + ')'));
+  applySession(j.access_token, j.refresh_token);
+  syncNow();
+  return true;
+}
+/* ---- Google sign-in (PKCE, no library) ---- */
+async function signInWithGoogle() {
+  if (!sbConfigured()) { showNotice('sb-cfg', 'Add the Supabase project URL in Settings first.'); return; }
+  if (location.protocol === 'file:') { showNotice('sb-file', 'Google sign-in needs the app on an http address: run serve.ps1 or use the hosted page.'); return; }
+  // Check the provider is on, so a disabled provider shows a message here instead of a raw error page.
+  try {
+    const s = await fetch(CFG.sbUrl + '/auth/v1/settings', { headers: { apikey: CFG.sbAnon } }).then(x => x.json());
+    if (s && s.external && s.external.google === false) {
+      showNotice('sb-google', 'Google sign-in is not switched on for this project yet. Use email and password for now, or enable the Google provider in Supabase (see SETUP.md).');
+      return;
+    }
+  } catch (e) { /* if the check itself fails, continue and let the redirect report */ }
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const verifier = b64url(bytes);
+  storeSet('dayu-pkce', verifier);
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = b64url(new Uint8Array(digest));
+  const redirect = location.origin + location.pathname;
+  location.href = CFG.sbUrl + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(redirect)
+    + '&code_challenge=' + challenge + '&code_challenge_method=s256';
+}
+// On load: finish an OAuth redirect if one is in the URL (PKCE ?code=, or implicit #access_token=)
+async function handleAuthRedirect() {
+  try {
+    const qs = new URLSearchParams(location.search);
+    if (qs.get('code') && sbConfigured()) {
+      const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=pkce', {
+        method: 'POST',
+        headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_code: qs.get('code'), code_verifier: storeGet('dayu-pkce') || '' }),
+      });
+      const j = await r.json().catch(() => ({}));
+      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ok */ }
+      if (r.ok && j.access_token) { applySession(j.access_token, j.refresh_token); toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : '')); }
+      else showNotice('sb-oauth', 'Google sign-in failed: ' + (j.error_description || j.msg || ('HTTP ' + r.status)));
+      return;
+    }
+    if (qs.get('error') || qs.get('error_description')) {
+      showNotice('sb-oauth', 'Google sign-in failed: ' + (qs.get('error_description') || qs.get('error')));
+      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ok */ }
+      return;
+    }
+    if (location.hash.indexOf('access_token=') >= 0 || location.hash.indexOf('error=') >= 0) {
+      const hs = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
+      if (hs.get('access_token')) {
+        applySession(hs.get('access_token'), hs.get('refresh_token') || '');
+        toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : ''));
+        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ok */ }
+      } else if (hs.get('error') || hs.get('error_description')) {
+        showNotice('sb-oauth', 'Google sign-in failed: ' + (hs.get('error_description') || hs.get('error')));
+        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ok */ }
+      }
+    }
+  } catch (e) { /* never block boot on auth parsing */ }
+}
+async function sbRefreshToken() {
+  try {
+    const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: CFG.sbRefresh }),
+    });
+    if (!r.ok) throw new Error('refresh failed');
+    const j = await r.json();
+    SB.access = j.access_token || null;
+    if (j.refresh_token) { CFG.sbRefresh = j.refresh_token; saveCfg(); }
+    return !!SB.access;
+  } catch (e) {
+    SB.access = null; CFG.sbRefresh = ''; saveCfg();
+    syncStatus('signin');
+    showNotice('sb-signin', 'Sync sign-in expired. Open Settings (⋯ menu) and sign in again.');
+    return false;
+  }
+}
+function sbSignOut() {
+  SB.access = null; CFG.sbRefresh = ''; CFG.sbEmail = '';
+  saveCfg(); syncStatus('signin');
+}
+function schedulePush() {
+  if (!sbConfigured() || (!SB.access && !CFG.sbRefresh)) return;
+  clearTimeout(SB.pushTimer);
+  SB.pushTimer = setTimeout(() => syncNow(), 2000);
+}
+let syncing = false;
+async function syncNow() {
+  if (!sbConfigured()) { syncStatus('local'); return; }
+  if (!SB.access) {
+    if (CFG.sbRefresh) { if (!await sbRefreshToken()) return; }
+    else { syncStatus('signin'); return; }
+  }
+  if (syncing) return;
+  syncing = true;
+  syncStatus('busy');
+  try {
+    const r = await sbFetch('/rest/v1/dayu_state?id=eq.main&select=data,updated_at');
+    if (r.status === 401) { syncStatus('signin'); return; }
+    if (!r.ok) { syncStatus('err', 'Pull failed: HTTP ' + r.status); return; }
+    const rows = await r.json();
+    SB.lastPull = Date.now();
+    const remote = rows && rows[0];
+    const localTs = (STATE.meta && STATE.meta.updatedAt) || 0;
+    const remoteTs = remote ? Date.parse(remote.updated_at) : 0;
+    if (remote && remoteTs > localTs + 500 && !modalNoteId) {
+      STATE = migrate(remote.data);
+      STATE.meta.updatedAt = remoteTs;
+      storeSet(STORE_KEY, JSON.stringify(STATE));
+      renderAll();
+      CFG.lastSyncAt = Date.now(); saveCfg();
+      syncStatus('ok');
+    } else if (!remote || localTs > remoteTs + 500) {
+      const pr = await sbFetch('/rest/v1/dayu_state', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(localTs || Date.now()).toISOString() }]),
+      });
+      if (pr.ok) { CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok'); }
+      else syncStatus('err', 'Push failed: HTTP ' + pr.status);
+    } else {
+      syncStatus('ok');
+    }
+  } catch (e) {
+    syncStatus('off');
+    if (!storageOK) showNotice('sandbox', 'This preview page can’t reach the internet, so AI and sync are off here. They work when Tack runs locally or on your own hosting.');
+  } finally {
+    syncing = false;
+  }
+}
+function initSync() {
+  syncStatus(sbConfigured() ? (CFG.sbRefresh ? 'busy' : 'signin') : 'local');
+  if (sbConfigured() && CFG.sbRefresh) syncNow();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && sbConfigured() && Date.now() - SB.lastPull > 30000) syncNow();
+  });
+}
+
+/* ---------- settings modal ---------- */
+function openSettings() {
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const body = h('div.sbody');
+
+  body.append(h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '2px' } }, 'AI & sync'),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '18px', fontSize: '13px' } }, 'Keys stay in this browser only; they are never synced. Set them once per device.'));
+
+  // --- Google AI ---
+  const keyIn = h('input.input.grow', { type: 'password', placeholder: 'Paste your AI Studio API key', value: CFG.gemKey, autocomplete: 'off' });
+  keyIn.addEventListener('input', () => { CFG.gemKey = keyIn.value.trim(); saveCfg(); });
+  const modelSel = h('select.input', {},
+    [['gemini-flash-latest', 'Gemini Flash, latest (default)'], ['gemini-flash-lite-latest', 'Gemini Flash-Lite, latest (higher free limits)'], ['gemini-pro-latest', 'Gemini Pro, latest (small free quota)']]
+      .map(([v, l]) => h('option', { value: v, selected: (CFG.gemModel || 'gemini-flash-latest') === v }, l)));
+  modelSel.addEventListener('change', () => { CFG.gemModel = modelSel.value; saveCfg(); });
+  const aiStatus = h('span', { style: { fontSize: '12.5px', fontWeight: '700' } });
+  const testBtn = h('button.btn.small', { onclick: async () => {
+    testBtn.disabled = true; aiStatus.textContent = 'Testing…'; aiStatus.className = '';
+    try { await gemini('Reply with exactly one word: ready'); aiStatus.textContent = '✓ AI is working'; aiStatus.className = 'okline'; }
+    catch (err) { aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', ''); aiStatus.className = 'errline'; }
+    testBtn.disabled = false;
+  } }, 'Test');
+  body.append(h('div.setsec', {},
+    h('span.label', {}, 'Google AI Studio'),
+    h('div.frow', {}, keyIn),
+    h('div.frow', {}, modelSel, testBtn, aiStatus),
+    h('div.setnote', {}, 'Free key from aistudio.google.com (API keys page). Powers “Draft steps” and the two Summarize buttons. If the free quota runs out you’ll get a notice at the top of the app.')));
+
+  // --- Supabase ---
+  const sec = h('div.setsec', {}, h('span.label', {}, 'Account & sync'));
+  const authRow = h('div');
+  sec.append(authRow);
+  // connection details, collapsed since they ship with the app
+  const urlIn = h('input.input.grow', { placeholder: 'https://yourproject.supabase.co', value: CFG.sbUrl, autocomplete: 'off' });
+  urlIn.addEventListener('input', () => { CFG.sbUrl = urlIn.value.trim().replace(/\/+$/, ''); saveCfg(); syncStatus(SB.status); });
+  const anonIn = h('input.input.grow', { type: 'password', placeholder: 'Publishable (or legacy anon) key', value: CFG.sbAnon, autocomplete: 'off' });
+  anonIn.addEventListener('input', () => { CFG.sbAnon = anonIn.value.trim(); saveCfg(); syncStatus(SB.status); });
+  const det = h('details', { style: { marginTop: '10px' } },
+    h('summary', { style: { cursor: 'pointer', fontSize: '12px', color: 'var(--ink3)', fontWeight: '700' } }, 'Connection details (project URL and key)'),
+    h('div.frow', {}, urlIn), h('div.frow', {}, anonIn));
+  sec.append(det, h('div.setnote', {}, 'Sign in and your board follows you to any device. Accounts are free; each person sees only their own board. Owner setup lives in SETUP.md.'));
+  body.append(sec);
+
+  function renderAuth() {
+    authRow.innerHTML = '';
+    if (SB.access || CFG.sbRefresh) {
+      const last = CFG.lastSyncAt ? 'Last synced ' + new Date(CFG.lastSyncAt).toLocaleString() : 'Not synced yet';
+      authRow.append(
+        h('div.frow', {}, h('span.okline', {}, '✓ Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : ''))),
+        h('div.frow', {},
+          h('button.btn.small', { onclick: async () => { await syncNow(); renderAuth(); } }, 'Sync now'),
+          h('button.btn.ghost.small', { onclick: () => { sbSignOut(); renderAuth(); } }, 'Sign out'),
+          h('span', { style: { fontSize: '12px', color: 'var(--ink3)' } }, last)));
+      return;
+    }
+    const gbtn = h('button.btn.primary', { onclick: () => signInWithGoogle() }, 'Continue with Google');
+    authRow.append(h('div.frow', {}, gbtn));
+    const em = h('input.input.grow', { type: 'email', placeholder: 'Email', value: CFG.sbEmail, autocomplete: 'off' });
+    const pw = h('input.input.grow', { type: 'password', placeholder: 'Password', autocomplete: 'off' });
+    const stat = h('span', { style: { fontSize: '12.5px' } });
+    const btn = h('button.btn.small', { onclick: async () => {
+      btn.disabled = true; stat.textContent = 'Signing in…'; stat.className = '';
+      try { await sbSignIn(em.value.trim(), pw.value); stat.textContent = ''; renderAuth(); }
+      catch (err) { stat.textContent = '✕ ' + err.message; stat.className = 'errline'; }
+      btn.disabled = false;
+    } }, 'Sign in');
+    pw.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+    authRow.append(
+      h('div.setnote', { style: { marginTop: '10px' } }, 'or with email and password:'),
+      h('div.frow', {}, em, pw, btn), h('div.frow', {}, stat));
+  }
+  renderAuth();
+
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {}, h('span', { style: { fontSize: '11.5px', color: 'var(--ink3)' } }, 'Changes save as you type'), h('button.btn.small', { onclick: closeModal }, 'Done')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+}
+
+'use strict';
+/* ================= Tack — canvas, notes, zones, modal ================= */
+const NOTE_W = 178;
+let drawMode = false;
+
+function catById(id) { return STATE.cats.find(c => c.id === id) || null; }
+function noteById(id) { return STATE.notes.find(n => n.id === id) || null; }
+function zoneCat(z) { return catById(z.catId); }
+function notesInCat(catId) { return STATE.notes.filter(n => !n.archived && n.catId === catId); }
+
+function noteBg(n) { const c = catById(n.catId); return c ? palById(c.color).bg : DEFAULT_NOTE_BG; }
+
+/* ---------- canvas render ---------- */
+function renderCanvas() {
+  const field = $('#field');
+  $$('.note, .zone, .hint, .zonepop', field).forEach(el => el.remove());
+
+  for (const z of STATE.zones) field.append(buildZone(z));
+  const live = STATE.notes.filter(n => !n.archived);
+  for (const n of live) field.append(buildNote(n));
+
+  if (!live.length && !STATE.zones.length) {
+    field.append(h('div.hint', {},
+      h('div', { style: { fontSize: '34px', marginBottom: '10px' } }, '📌'),
+      h('div', {}, h('b', {}, 'Double-click anywhere'), ' to pin your first note.'),
+      h('div', { style: { marginTop: '4px' } }, 'Then draw a cluster and drag notes into it.')));
+  }
+}
+
+/* ---------- zones ---------- */
+function buildZone(z) {
+  const cat = zoneCat(z), pal = palById(cat ? cat.color : 'sky');
+  const el = h('div.zone', { dataset: { id: z.id }, style: { left: z.x + 'px', top: z.y + 'px', width: z.w + 'px', height: z.h + 'px' } },
+    h('div.zbg', { style: { background: pal.deep } }),
+    h('div.zborder', { style: { borderColor: pal.deep } }),
+    h('div.zhead', {},
+      h('span.dot', { style: { width: '8px', height: '8px', borderRadius: '50%', background: pal.deep, flex: '0 0 auto' } }),
+      h('span', {}, cat ? cat.name : '?'),
+      h('span.zcount', {}, String(notesInCat(z.catId).length)),
+      h('button.zdel', { title: 'Remove this area (notes keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
+    h('div.zresize', { title: 'Resize' }));
+
+  // move zone by its header
+  const head = $('.zhead', el);
+  head.addEventListener('pointerdown', e => {
+    if (e.target.closest('.zdel') || e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    dragXY(e, head, (dx, dy) => {
+      z.x = clamp(z.x + dx, 0, 2600 - z.w); z.y = clamp(z.y + dy, 14, 1800 - z.h);
+      el.style.left = z.x + 'px'; el.style.top = z.y + 'px';
+    }, () => save());
+  });
+  // resize
+  const rz = $('.zresize', el);
+  rz.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    dragXY(e, rz, (dx, dy) => {
+      z.w = clamp(z.w + dx, 130, 2600 - z.x); z.h = clamp(z.h + dy, 100, 1800 - z.y);
+      el.style.width = z.w + 'px'; el.style.height = z.h + 'px';
+    }, () => save());
+  });
+  return el;
+}
+function removeZone(id) {
+  undoableAction('Cluster area removed. Notes kept their category', () => {
+    STATE.zones = STATE.zones.filter(z => z.id !== id);
+  });
+}
+// generic incremental drag helper: cb gets deltas since last move
+function dragXY(e, elm, onMove, onUp) {
+  let lx = e.clientX, ly = e.clientY;
+  elm.setPointerCapture(e.pointerId);
+  const mv = ev => { onMove(ev.clientX - lx, ev.clientY - ly); lx = ev.clientX; ly = ev.clientY; };
+  const up = () => { elm.removeEventListener('pointermove', mv); elm.removeEventListener('pointerup', up); elm.removeEventListener('pointercancel', up); if (onUp) onUp(); };
+  elm.addEventListener('pointermove', mv);
+  elm.addEventListener('pointerup', up);
+  elm.addEventListener('pointercancel', up);
+}
+
+/* ---------- notes ---------- */
+function buildNote(n) {
+  const el = h('div.note', { dataset: { id: n.id }, style: { left: n.x + 'px', top: n.y + 'px', background: noteBg(n), zIndex: n.z || 10 } });
+  if (n.completedAt) el.classList.add('done');
+
+  const chk = h('button.chk', { title: n.completedAt ? 'Not done after all' : 'Done: sends it to the archive', innerHTML: TICK_SVG, onclick: e => { e.stopPropagation(); toggleDone(n.id); } });
+  el.append(chk);
+
+  if (n.editing) {
+    const ta = h('textarea', { rows: 2, placeholder: 'What needs doing?', value: n.title });
+    const commit = () => {
+      delete n.editing;
+      n.title = ta.value.trim();
+      if (!n.title) STATE.notes = STATE.notes.filter(x => x.id !== n.id);
+      save(); renderCanvas();
+    };
+    ta.addEventListener('blur', commit);
+    ta.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); ta.blur(); }
+      if (ev.key === 'Escape') { ta.value = n.title; ta.blur(); }
+      ev.stopPropagation();
+    });
+    ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+    ta.addEventListener('pointerdown', ev => ev.stopPropagation());
+    el.append(ta);
+    setTimeout(() => { ta.focus(); ta.style.height = ta.scrollHeight + 'px'; }, 0);
+  } else {
+    el.append(h('div.ntitle', {}, n.title));
+    const meta = h('div.nmeta');
+    const cat = catById(n.catId);
+    if (cat) meta.append(h('span.ncat', { style: { color: palById(cat.color).deep } }, cat.name));
+    if (n.steps.length) meta.append(h('span.nsteps', {}, n.steps.filter(s => s.done).length + '/' + n.steps.length + ' steps'));
+    if (meta.children.length) el.append(meta);
+  }
+
+  // drag vs click
+  el.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('.chk') || e.target.tagName === 'TEXTAREA') return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ox = n.x, oy = n.y;
+    let moved = false;
+    el.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved && Math.abs(dx) + Math.abs(dy) > 5) {
+        moved = true;
+        el.classList.add('dragging');
+        n.z = ++STATE.zTop; el.style.zIndex = n.z;
+      }
+      if (moved) {
+        n.x = clamp(ox + dx, 0, 2600 - NOTE_W); n.y = clamp(oy + dy, 0, 1800 - 70);
+        el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
+      }
+    };
+    const up = ev => {
+      el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      el.classList.remove('dragging');
+      if (!moved) { openNote(n.id); return; }
+      dropAssign(n, el, ev);
+      save();
+    };
+    el.addEventListener('pointermove', mv);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  });
+  return el;
+}
+
+function zoneAt(cx, cy) {
+  for (let i = STATE.zones.length - 1; i >= 0; i--) {
+    const z = STATE.zones[i];
+    if (cx >= z.x && cx <= z.x + z.w && cy >= z.y && cy <= z.y + z.h) return z;
+  }
+  return null;
+}
+function dropAssign(n, el, ev) {
+  const cx = n.x + el.offsetWidth / 2, cy = n.y + el.offsetHeight / 2;
+  const z = zoneAt(cx, cy);
+  const before = n.catId;
+  if (z) n.catId = z.catId;
+  else if (n.catId && STATE.zones.some(zz => zz.catId === n.catId)) n.catId = null; // pulled out of its home area
+  if (n.catId !== before) {
+    const cat = catById(n.catId);
+    dropChip(ev.clientX, ev.clientY, cat ? '→ ' + cat.name : 'No category');
+    renderCanvas();
+  } else {
+    renderCanvas(); // refresh zone counts / colors anyway (cheap)
+  }
+}
+function dropChip(x, y, text) {
+  const c = h('div.dropchip', { style: { left: x + 12 + 'px', top: y - 34 + 'px' } }, text);
+  document.body.append(c);
+  setTimeout(() => c.remove(), 1150);
+}
+
+/* ---------- create notes ---------- */
+function newNoteAt(x, y) {
+  const n = {
+    id: uid(), title: '', desc: '', x: clamp(x, 0, 2600 - NOTE_W), y: clamp(y, 0, 1800 - 70),
+    catId: (zoneAt(x + NOTE_W / 2, y + 35) || {}).catId || null,
+    createdAt: Date.now(), completedAt: null, archived: false, steps: [], z: ++STATE.zTop, editing: true,
+  };
+  STATE.notes.push(n);
+  save(); renderCanvas();
+}
+function newNoteCenter() {
+  const b = $('#board');
+  const x = b.scrollLeft + b.clientWidth / 2 - NOTE_W / 2 + (Math.random() * 60 - 30);
+  const y = b.scrollTop + b.clientHeight / 2 - 60 + (Math.random() * 60 - 30);
+  newNoteAt(x, y);
+}
+
+/* ---------- complete / archive flow ---------- */
+function toggleDone(id) {
+  const n = noteById(id);
+  if (!n) return;
+  if (n.completedAt) { // un-complete
+    n.completedAt = null;
+    save(); renderCanvas(); completionChanged();
+    return;
+  }
+  const snap = snapshot();
+  n.completedAt = Date.now();
+  const el = $('.note[data-id="' + n.id + '"]');
+  if (el) el.classList.add('done');
+  completionChanged();
+  save();
+  setTimeout(() => {
+    const elNow = $('.note[data-id="' + n.id + '"]');
+    if (elNow && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const r = elNow.getBoundingClientRect();
+      const target = $('#meters').getBoundingClientRect();
+      elNow.classList.add('flyoff');
+      elNow.style.transform = 'translate(' + (target.right - 60 - r.left) + 'px,' + (target.top - r.top) + 'px) scale(.08) rotate(8deg)';
+      setTimeout(finish, 480);
+    } else finish();
+    function finish() {
+      const nn = noteById(id);
+      if (!nn || !nn.completedAt) return; // undone in the meantime
+      nn.archived = true;
+      save(); renderCanvas(); renderMeters();
+      toast('“' + (nn.title || 'Untitled') + '” archived', () => { restore(snap); completionChanged(); });
+    }
+  }, 620);
+}
+
+/* ---------- draw-cluster mode ---------- */
+function setDrawMode(on) {
+  drawMode = on;
+  $('#btnZone').classList.toggle('on', on);
+  $('#field').classList.toggle('drawing', on);
+}
+function wireCanvas() {
+  const board = $('#board'), field = $('#field');
+  $('#btnNote').addEventListener('click', newNoteCenter);
+  $('#btnZone').addEventListener('click', () => setDrawMode(!drawMode));
+
+  field.addEventListener('dblclick', e => {
+    if (e.target !== field) return;
+    const r = field.getBoundingClientRect();
+    newNoteAt(e.clientX - r.left - NOTE_W / 2, e.clientY - r.top - 20);
+  });
+
+  field.addEventListener('pointerdown', e => {
+    if (!drawMode || e.target !== field || e.button !== 0) return;
+    e.preventDefault();
+    const r = field.getBoundingClientRect();
+    const ax = e.clientX - r.left, ay = e.clientY - r.top;
+    const prev = $('#drawPreview');
+    prev.style.display = 'block';
+    let w = 0, hgt = 0, x = ax, y = ay;
+    field.setPointerCapture(e.pointerId);
+    const mv = ev => {
+      const bx = ev.clientX - r.left, by = ev.clientY - r.top;
+      x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hgt = Math.abs(by - ay);
+      Object.assign(prev.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hgt + 'px' });
+    };
+    const up = () => {
+      field.removeEventListener('pointermove', mv); field.removeEventListener('pointerup', up); field.removeEventListener('pointercancel', up);
+      prev.style.display = 'none';
+      setDrawMode(false);
+      if (w > 70 && hgt > 60) zoneNamePopover(x, y, Math.max(w, 130), Math.max(hgt, 100));
+    };
+    field.addEventListener('pointermove', mv);
+    field.addEventListener('pointerup', up);
+    field.addEventListener('pointercancel', up);
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { setDrawMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
+  });
+}
+
+function zoneNamePopover(x, y, w, hgt) {
+  $$('.zonepop').forEach(p => p.remove());
+  const unused = PAL.filter(p => !STATE.cats.some(c => c.color === p.id));
+  let color = (unused[0] || PAL[STATE.cats.length % PAL.length]).id;
+  const nameIn = h('input.input', { placeholder: 'Name this cluster…', maxLength: 40 });
+  const existing = STATE.cats.filter(c => !STATE.zones.some(z => z.catId === c.id));
+  const sel = existing.length ? h('select.input', {},
+    h('option', { value: '' }, '…or use an existing category'),
+    existing.map(c => h('option', { value: c.id }, c.name))) : null;
+  const dots = h('div.dots', {}, PAL.map(p => {
+    const b = h('button.cdot' + (p.id === color ? '.on' : ''), { style: { background: p.bg }, title: p.name, onclick: () => { color = p.id; $$('.cdot', dots).forEach(d => d.classList.remove('on')); b.classList.add('on'); } });
+    return b;
+  }));
+  const create = () => {
+    let catId = sel && sel.value ? sel.value : null;
+    const nm = nameIn.value.trim();
+    if (!catId) {
+      if (!nm) { nameIn.focus(); return; }
+      const existingByName = STATE.cats.find(c => c.name.toLowerCase() === nm.toLowerCase());
+      if (existingByName) catId = existingByName.id;
+      else { const c = { id: uid(), name: nm, color }; STATE.cats.push(c); catId = c.id; }
+    }
+    STATE.zones.push({ id: uid(), catId, x, y, w, h: hgt });
+    // adopt notes already inside the new area
+    for (const n of STATE.notes) {
+      if (n.archived) continue;
+      const cx = n.x + NOTE_W / 2, cy = n.y + 35;
+      if (cx >= x && cx <= x + w && cy >= y && cy <= y + hgt) n.catId = catId;
+    }
+    pop.remove();
+    save(); renderCanvas();
+  };
+  const pop = h('div.zonepop', { style: { left: x + 'px', top: (y + hgt + 8) + 'px' } },
+    h('div.label', {}, 'New cluster'),
+    nameIn, sel, dots,
+    h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
+      h('button.btn.ghost.small', { onclick: () => pop.remove() }, 'Cancel'),
+      h('button.btn.primary.small', { onclick: create }, 'Create')));
+  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') create(); });
+  $('#field').append(pop);
+  setTimeout(() => nameIn.focus(), 0);
+}
+
+/* ---------- note modal ---------- */
+let modalNoteId = null;
+function closeModal() {
+  const root = $('#modalRoot');
+  if (!root.classList.contains('open')) return;
+  root.classList.remove('open'); root.innerHTML = '';
+  modalNoteId = null;
+  renderCanvas(); renderMeters();
+  if (currentPage() === 'archive') renderArchive();
+}
+function openNote(id) {
+  const n = noteById(id);
+  if (!n) return;
+  modalNoteId = id;
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+
+  const cat = catById(n.catId);
+  const sheet = h('div.sheet');
+  sheet.append(h('div.ctab', { style: { background: cat ? palById(cat.color).bg : DEFAULT_NOTE_BG } }));
+
+  const body = h('div.sbody');
+  sheet.append(body);
+
+  // title row with big check
+  const bigchk = h('button.bigchk' + (n.completedAt ? '.done' : ''), { title: n.completedAt ? 'Not done after all' : 'Done: sends it to the archive', innerHTML: TICK_SVG, onclick: () => { closeModal(); toggleDone(n.id); } });
+  const ttl = h('textarea.ttl', { rows: 1, placeholder: 'What needs doing?', value: n.title });
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+  ttl.addEventListener('input', () => { n.title = ttl.value; grow(ttl); save(); });
+  ttl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ttl.blur(); } });
+  body.append(h('div.srow', {}, bigchk, ttl));
+
+  const desc = h('textarea.desc', { rows: 1, placeholder: 'Add a note to self…', value: n.desc || '' });
+  desc.addEventListener('input', () => { n.desc = desc.value; grow(desc); save(); });
+  body.append(desc);
+
+  // steps
+  const stepsBox = h('div.steps');
+  const aiBtn = h('button.btn.ghost.small', { onclick: () => draftSteps(n, aiBtn, stepsBox, aiNote) }, '✨ Draft steps');
+  const aiNote = h('div.ainote');
+  body.append(h('div.sec', {},
+    h('div.sechead', {}, h('span.label', {}, 'Steps'), aiBtn),
+    stepsBox, aiNote));
+  renderSteps(n, stepsBox);
+
+  // category picker
+  const pick = h('div.catpick');
+  body.append(h('div.sec', {}, h('div.sechead', {}, h('span.label', {}, 'Category')), pick));
+  renderCatPick(n, pick, sheet);
+
+  // meta
+  const metaBox = h('div.meta', {},
+    h('div.mitem', {}, h('span.label', {}, 'Created'), h('span.mval', {}, fmtFull(n.createdAt))),
+    n.completedAt ? h('div.mitem', {}, h('span.label', {}, 'Completed'), h('span.mval', {}, fmtFull(n.completedAt))) : null);
+  body.append(metaBox);
+
+  // footer
+  sheet.append(h('div.sfoot', {},
+    h('button.btn.danger.small', { onclick: () => { closeModal(); undoableAction('Note deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); }); } }, 'Delete'),
+    h('button.btn.small', { onclick: closeModal }, 'Close')));
+
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+  setTimeout(() => { grow(ttl); grow(desc); if (!n.title) ttl.focus(); }, 0);
+}
+
+function renderSteps(n, box) {
+  box.innerHTML = '';
+  for (const s of n.steps) {
+    const inp = h('input', { type: 'text', value: s.text });
+    inp.addEventListener('input', () => { s.text = inp.value; save(); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') addInp.focus(); });
+    const row = h('div.step' + (s.done ? '.done' : ''), {},
+      h('button.schk' + (s.done ? '.done' : ''), { innerHTML: s.done ? TICK_SVG : '', onclick: () => { s.done = !s.done; save(); renderSteps(n, box); } }),
+      inp,
+      h('button.sdel', { title: 'Remove step', onclick: () => { n.steps = n.steps.filter(x => x.id !== s.id); save(); renderSteps(n, box); } }, '✕'));
+    box.append(row);
+  }
+  const addInp = h('input', { type: 'text', placeholder: n.steps.length ? 'Add another step…' : 'Break it down. Add a step…' });
+  addInp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && addInp.value.trim()) {
+      n.steps.push({ id: uid(), text: addInp.value.trim(), done: false });
+      save(); renderSteps(n, box);
+      setTimeout(() => { const inps = $$('.addstep input', box.parentElement); if (inps.length) inps[inps.length - 1].focus(); }, 0);
+    }
+  });
+  box.append(h('div.addstep', {}, h('span.plus', {}, '+'), addInp));
+}
+
+function renderCatPick(n, pick, sheet) {
+  pick.innerHTML = '';
+  for (const c of STATE.cats) {
+    const pal = palById(c.color);
+    const on = n.catId === c.id;
+    pick.append(h('button.chip' + (on ? '.on' : ''), { onclick: () => { n.catId = on ? null : c.id; save(); renderCatPick(n, pick, sheet); $('.ctab', sheet).style.background = n.catId ? pal.bg : DEFAULT_NOTE_BG; } },
+      h('span.dot', { style: { background: pal.bg, border: '1px solid ' + pal.deep } }), c.name));
+  }
+  const newBtn = h('button.chip', { onclick: () => {
+    const inp = h('input.input', { placeholder: 'New category…', maxLength: 40, style: { padding: '4px 10px', fontSize: '12px' } });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && inp.value.trim()) {
+        const color = (PAL.filter(p => !STATE.cats.some(c => c.color === p.id))[0] || PAL[STATE.cats.length % PAL.length]).id;
+        const c = { id: uid(), name: inp.value.trim(), color };
+        STATE.cats.push(c); n.catId = c.id;
+        save(); renderCatPick(n, pick, sheet);
+        $('.ctab', sheet).style.background = palById(color).bg;
+      }
+      if (e.key === 'Escape') renderCatPick(n, pick, sheet);
+    });
+    newBtn.replaceWith(inp); inp.focus();
+  } }, '＋ New');
+  pick.append(newBtn);
+}
+
+/* ---------- AI: draft steps (Google AI when configured, sample fallback) ---------- */
+function sampleSteps(title) {
+  const t = (title || 'this task').replace(/\s+/g, ' ').trim();
+  const short = t.length > 46 ? t.slice(0, 44) + '…' : t;
+  return [
+    'Write one sentence: what does “' + short + '” look like when it’s done?',
+    'Gather what you need first: links, files, tools, people.',
+    'Do the smallest first piece to get moving (10 to 15 min).',
+    'Push through a rough, ugly-but-complete pass.',
+    'Tidy up, check against your first sentence, then check it off.',
+  ];
+}
+async function draftSteps(n, btn, stepsBox, aiNote) {
+  btn.disabled = true; btn.textContent = 'Drafting…'; aiNote.textContent = '';
+  let lines = null, note = '';
+  if (aiConfigured()) {
+    try {
+      const cat = catById(n.catId);
+      const txt = await gemini('Break this to-do into 3 to 6 brief, direct steps.\nTask: ' + (n.title || 'Untitled')
+        + (n.desc ? '\nNotes: ' + n.desc : '') + (cat ? '\nCategory: ' + cat.name : '')
+        + '\nReply with one step per line. No numbering, no bullets, no intro line, no closing line, no em dashes.');
+      lines = txt.split('\n').map(s => s.replace(/^[\s\-\*•\d.)]+/, '').trim()).filter(s => s.length > 2).slice(0, 8);
+      if (!lines.length) { lines = null; note = 'The AI reply came back empty, used sample steps instead.'; }
+    } catch (err) {
+      note = aiFailNote(err).replace('this is the locally computed fallback', 'these are sample steps');
+    }
+  } else {
+    note = 'Sample steps. Add your Google AI Studio key in Settings (⋯ menu) for tailored ones.';
+  }
+  if (!lines) lines = sampleSteps(n.title);
+  for (const text of lines) n.steps.push({ id: uid(), text, done: false });
+  save(); renderSteps(n, stepsBox);
+  btn.disabled = false; btn.textContent = '✨ Draft steps';
+  aiNote.textContent = note;
+}
+
+'use strict';
+/* ================= Tack — daily goals (sheet) & dashboard ================= */
+
+function activeHabits() { return STATE.habits.filter(x => !x.archivedAt).sort((a, b) => (a.order || 0) - (b.order || 0)); }
+function retiredHabits() { return STATE.habits.filter(x => x.archivedAt).sort((a, b) => b.archivedAt - a.archivedAt); }
+function todayKey() { return dayKey(Date.now()); }
+function habitCheckedToday(hb) { return !!hb.days[todayKey()]; }
+function keyToTs(k) { return new Date(k + 'T12:00').getTime(); }
+
+function habitStats(hb) {
+  const keys = Object.keys(hb.days).sort();
+  const end = startOfDay(hb.archivedAt || Date.now());
+  let start = startOfDay(hb.createdAt);
+  if (keys.length) start = Math.min(start, startOfDay(keyToTs(keys[0])));
+  const totalDays = Math.max(1, Math.round((end - start) / DAY) + 1);
+  const checked = keys.length;
+  const pct = Math.round(checked / totalDays * 100);
+  // best streak
+  let best = 0, run = 0, prev = null;
+  for (const k of keys) {
+    const t = startOfDay(keyToTs(k));
+    run = (prev !== null && t - prev === DAY) ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = t;
+  }
+  // current streak: consecutive days ending today (or yesterday if today unchecked)
+  let cur = 0;
+  let cursor = startOfDay(Date.now());
+  if (!hb.days[dayKey(cursor)]) cursor -= DAY;
+  while (hb.days[dayKey(cursor)]) { cur++; cursor -= DAY; }
+  return { totalDays, checked, pct, best, cur, since: start };
+}
+
+function lastNDaysKeys(n) {
+  const out = [];
+  const t0 = startOfDay(Date.now());
+  for (let i = n - 1; i >= 0; i--) out.push(dayKey(t0 - i * DAY));
+  return out;
+}
+
+/* ---------- clean-sweep celebration ---------- */
+let lastSweepDay = null;
+function toggleHabit(hb, dk) {
+  if (hb.days[dk]) delete hb.days[dk]; else hb.days[dk] = 1;
+  save();
+  renderMeters();
+  const habs = activeHabits();
+  if (dk === todayKey() && lastSweepDay !== dk && habs.length && habs.every(habitCheckedToday)) {
+    lastSweepDay = dk;
+    const mrect = $('#meters').getBoundingClientRect();
+    confetti(mrect.left + mrect.width / 2 || innerWidth - 160, mrect.bottom + 10 || 60);
+    toast('Daily goals: clean sweep for today ✓', null, 3200);
+  }
+}
+
+/* ---------- the sheet (goals page) ---------- */
+const SHEET_DAYS = 14;
+function renderHabitSheet() {
+  const box = h('div');
+  const habs = activeHabits();
+  const done = habs.filter(habitCheckedToday).length;
+  box.append(h('div.hsheet-head', {},
+    h('span.label', {}, 'Daily goals'),
+    habs.length ? h('span.todaychip', {}, 'Today: ' + done + ' of ' + habs.length) : null));
+
+  const keys = lastNDaysKeys(SHEET_DAYS);
+  const tk = todayKey();
+  const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  const thead = h('thead', {}, h('tr', {},
+    h('th.hname', {}, ''),
+    keys.map(k => {
+      const d = new Date(k + 'T12:00');
+      return h('th' + (k === tk ? '.todaycol' : ''), {}, letters[d.getDay()], h('span.dnum', {}, String(d.getDate())));
+    })));
+
+  const tbody = h('tbody');
+  for (const hb of habs) {
+    const nameTd = h('td.hname');
+    const nameSpan = h('span', {}, hb.name);
+    const tools = h('span.htools', {},
+      h('button', { title: 'Rename', onclick: () => {
+        const inp = h('input', { value: hb.name, maxLength: 60 });
+        const commit = () => { hb.name = inp.value.trim() || hb.name; save(); renderGoals(); };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = hb.name; inp.blur(); } });
+        nameTd.innerHTML = ''; nameTd.append(inp); inp.focus(); inp.select();
+      } }, '✎'),
+      h('button', { title: 'Retire: stop tracking, keep its history on the Dashboard', onclick: () => {
+        undoableAction('“' + hb.name + '” retired. Its history stays on the Dashboard', () => { hb.archivedAt = Date.now(); });
+      } }, '🗄'),
+      h('button', { title: 'Delete forever', onclick: () => {
+        undoableAction('“' + hb.name + '” deleted', () => { STATE.habits = STATE.habits.filter(x => x.id !== hb.id); });
+      } }, '✕'));
+    nameTd.append(nameSpan, tools);
+    const tr = h('tr', {}, nameTd);
+    for (const k of keys) {
+      const cell = h('button.hcell', { title: hb.name + ' · ' + k, innerHTML: hb.days[k] ? TICK_SVG.replace('stroke-dashoffset:14', '') : '' });
+      cell.addEventListener('click', () => {
+        toggleHabit(hb, k);
+        cell.innerHTML = hb.days[k] ? TICK_SVG : '';
+        const chip = $('.todaychip', box);
+        if (chip) chip.textContent = 'Today: ' + activeHabits().filter(habitCheckedToday).length + ' of ' + activeHabits().length;
+      });
+      tr.append(h('td' + (k === tk ? '.todaycol' : ''), {}, cell));
+    }
+    tbody.append(tr);
+  }
+  // add row
+  const addInp = h('input', { placeholder: '＋ Add a daily goal and press Enter…', maxLength: 60 });
+  addInp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && addInp.value.trim()) {
+      const maxOrder = STATE.habits.reduce((m, x) => Math.max(m, x.order || 0), 0);
+      STATE.habits.push({ id: uid(), name: addInp.value.trim(), order: maxOrder + 1, createdAt: Date.now(), archivedAt: null, days: {} });
+      save(); renderGoals(); renderMeters();
+      setTimeout(() => { const i = $('.haddrow input'); if (i) i.focus(); }, 0);
+    }
+  });
+  tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
+
+  box.append(h('div.hwrap', {}, h('table.htable', {}, thead, tbody)));
+  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to check that day off. The Dashboard tab keeps score.'));
+  return box;
+}
+
+/* ---------- dashboard page ---------- */
+function renderDashboard() {
+  const inner = $('#dashInner');
+  inner.innerHTML = '';
+  inner.append(h('h1', {}, 'Dashboard'), h('div.sub', {}, 'How your daily goals are actually going.'));
+
+  const habs = activeHabits(), ret = retiredHabits();
+  const last7 = lastNDaysKeys(7);
+
+  // stat tiles
+  if (habs.length || ret.length) {
+    const possible7 = habs.length * 7;
+    const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k]).length, 0);
+    const totalChecks = STATE.habits.reduce((a, hb) => a + Object.keys(hb.days).length, 0);
+    let bestName = '', bestVal = 0, curBest = 0, curName = '';
+    for (const hb of STATE.habits) {
+      const s = habitStats(hb);
+      if (s.best > bestVal) { bestVal = s.best; bestName = hb.name; }
+      if (!hb.archivedAt && s.cur > curBest) { curBest = s.cur; curName = hb.name; }
+    }
+    const dayWord = n => n === 1 ? ' day' : ' days';
+    inner.append(h('div.statrow', {},
+      h('div.stat', {}, h('div.snum', {}, possible7 ? Math.round(hit7 / possible7 * 100) + '%' : '·'), h('div.slab', {}, 'Hit rate, last 7 days')),
+      h('div.stat', {}, h('div.snum', {}, String(totalChecks)), h('div.slab', {}, 'Checks, all time')),
+      h('div.stat', {}, h('div.snum', {}, curBest, h('small', {}, dayWord(curBest))), h('div.slab', {}, curName ? 'Streak now · ' + curName : 'Streak now')),
+      h('div.stat', {}, h('div.snum', {}, bestVal, h('small', {}, dayWord(bestVal))), h('div.slab', {}, bestName ? 'Best ever · ' + bestName : 'Best ever'))));
+  }
+
+  // per-habit cards
+  const habSec = h('div.dsec', {}, h('span.label', {}, 'Daily goals'));
+  if (!habs.length) habSec.append(h('div.empty', {}, 'No daily goals yet. Add them on the Goals page and they’ll be scored here.'));
+  for (const hb of habs) habSec.append(habCard(hb, false));
+  inner.append(habSec);
+
+  if (ret.length) {
+    const retSec = h('div.dsec', {}, h('span.label', {}, 'Retired (history kept)'));
+    for (const hb of ret) retSec.append(habCard(hb, true));
+    inner.append(retSec);
+  }
+
+  // task goals echo
+  if (STATE.goals.length) {
+    const tg = h('div.dsec', {}, h('span.label', {}, 'Task goals'));
+    for (const g of STATE.goals) {
+      const n = goalCount(g), pct = clamp(n / g.target * 100, 0, 100);
+      tg.append(h('div.minigoal', {},
+        h('span.mgname', {}, g.name),
+        h('div.gtrack', {}, h('div.gfill' + (n >= g.target ? '.full' : ''), { style: { width: pct + '%', height: '100%', borderRadius: '4px', background: n >= g.target ? 'var(--good)' : 'var(--accent)' } })),
+        h('span.gnum', {}, n + ' / ' + g.target + ' ' + PERIOD_LABEL[g.period])));
+    }
+    inner.append(tg);
+  }
+
+  // AI summary
+  inner.append(buildDashSummarySection());
+}
+
+function habCard(hb, retired) {
+  const s = habitStats(hb);
+  const keys = lastNDaysKeys(30);
+  const tk = todayKey();
+  const card = h('div.hab' + (retired ? '.retired' : ''), {},
+    h('div.hhead', {},
+      h('span.hnamebig', {}, hb.name),
+      retired ? h('button.btn.ghost.small', { onclick: () => { hb.archivedAt = null; save(); renderDashboard(); renderMeters(); } }, 'Resume') : null,
+      retired ? h('button.btn.danger.small', { onclick: () => undoableAction('“' + hb.name + '” deleted', () => { STATE.habits = STATE.habits.filter(x => x.id !== hb.id); }) }, 'Delete') : null,
+      h('span.hpct', {}, s.pct + '%')),
+    h('div.hmeta', {}, 'Since ' + fmtDY(s.since) + ' · ' + s.checked + ' of ' + s.totalDays + ' days'
+      + (retired ? ' · retired ' + fmtDY(hb.archivedAt) : ' · streak ' + s.cur + ' (best ' + s.best + ')')));
+  if (!retired) {
+    const strip = h('div.strip');
+    for (const k of keys) strip.append(h('span.sq' + (hb.days[k] ? '.on' : '') + (k === tk ? '.today' : ''), { title: k + (hb.days[k] ? ' ✓' : '') }));
+    card.append(strip);
+  }
+  return card;
+}
+
+/* ---------- dashboard AI summary ---------- */
+function dashData() {
+  return {
+    today: todayKey(),
+    dailyGoals: STATE.habits.map(hb => {
+      const s = habitStats(hb);
+      return {
+        name: hb.name, retired: !!hb.archivedAt, since: dayKey(s.since),
+        daysTracked: s.totalDays, daysHit: s.checked, hitRatePct: s.pct,
+        currentStreak: s.cur, bestStreak: s.best,
+        last14: lastNDaysKeys(14).map(k => hb.days[k] ? '1' : '0').join(''),
+      };
+    }),
+    taskGoals: STATE.goals.map(g => ({ name: g.name, target: g.target, period: g.period, progress: goalCount(g) })),
+  };
+}
+function sampleDashSummary() {
+  const habs = activeHabits();
+  if (!habs.length) return 'No daily goals tracked yet, so there is nothing to score. Add a few on the Goals page.';
+  const last7 = lastNDaysKeys(7);
+  const lines = [];
+  const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k]).length, 0);
+  lines.push('Last 7 days: you hit ' + hit7 + ' of ' + habs.length * 7 + ' possible checks (' + Math.round(hit7 / (habs.length * 7) * 100) + '%).');
+  const scored = habs.map(hb => ({ hb, s: habitStats(hb) })).sort((a, b) => b.s.pct - a.s.pct);
+  const top = scored[0], low = scored[scored.length - 1];
+  lines.push('Strongest: “' + top.hb.name + '” at ' + top.s.pct + '% (streak ' + top.s.cur + ', best ' + top.s.best + ').');
+  if (low !== top) lines.push('Weakest: “' + low.hb.name + '” at ' + low.s.pct + '%. Try anchoring it to something you already do every day.');
+  const curMax = scored.slice().sort((a, b) => b.s.cur - a.s.cur)[0];
+  if (curMax.s.cur >= 2) lines.push('Live streak: ' + curMax.s.cur + ' days of “' + curMax.hb.name + '”. Don’t break the chain today.');
+  return lines.join('\n');
+}
+function buildDashSummarySection() {
+  const prompts = STATE.prompts.filter(p => p.scope === 'dashboard');
+  const sel = h('select.input.grow', {}, prompts.map(p => h('option', { value: p.id }, p.name)));
+  const out = h('div.aiout');
+  const run = h('button.btn.primary.small', { onclick: async () => {
+    const p = STATE.prompts.find(x => x.id === sel.value);
+    out.classList.add('show'); out.textContent = 'Summarizing…'; run.disabled = true;
+    out.textContent = await summarize(p, dashData(), sampleDashSummary);
+    run.disabled = false;
+  } }, 'Summarize');
+  return h('div.aisec.dsec', {},
+    h('div.sechead', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+      h('span.label', {}, 'AI review of your goal keeping'),
+      h('button.btn.ghost.small', { onclick: () => openPromptsModal('dashboard') }, 'Manage prompts')),
+    h('div.frow', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } }, sel, run),
+    out);
+}
+
+'use strict';
+/* ================= Tack — archive & goals pages, boot ================= */
+
+/* ---------- archive ---------- */
+const afilters = { q: '', cats: new Set(), from: '', to: '', quick: 'all' };
+
+function archivedNotes() {
+  let list = STATE.notes.filter(n => n.archived && n.completedAt);
+  if (afilters.q) {
+    const q = afilters.q.toLowerCase();
+    list = list.filter(n => (n.title || '').toLowerCase().includes(q) || (n.desc || '').toLowerCase().includes(q));
+  }
+  if (afilters.cats.size) list = list.filter(n => afilters.cats.has(n.catId || 'none'));
+  if (afilters.from) { const t = new Date(afilters.from + 'T00:00').getTime(); list = list.filter(n => n.completedAt >= t); }
+  if (afilters.to) { const t = new Date(afilters.to + 'T00:00').getTime() + DAY; list = list.filter(n => n.completedAt < t); }
+  return list.sort((a, b) => b.completedAt - a.completedAt);
+}
+
+function renderArchive() {
+  const inner = $('#archiveInner');
+  inner.innerHTML = '';
+  inner.append(h('h1', {}, 'Archive'), h('div.sub', {}, 'Everything you’ve finished. Filter, restore, or run a summary.'));
+
+  // --- filters ---
+  const qIn = h('input.input.grow', { placeholder: 'Search by name…', value: afilters.q });
+  qIn.addEventListener('input', () => { afilters.q = qIn.value; refresh(); });
+  const fromIn = h('input.input', { type: 'date', value: afilters.from, title: 'Completed on or after' });
+  const toIn = h('input.input', { type: 'date', value: afilters.to, title: 'Completed on or before' });
+  fromIn.addEventListener('change', () => { afilters.from = fromIn.value; afilters.quick = ''; refresh(); });
+  toIn.addEventListener('change', () => { afilters.to = toIn.value; afilters.quick = ''; refresh(); });
+  const quick = h('select.input', {},
+    [['all', 'All time'], ['7', 'Last 7 days'], ['30', 'Last 30 days'], ['', 'Custom range']].map(([v, l]) =>
+      h('option', { value: v, selected: afilters.quick === v }, l)));
+  quick.addEventListener('change', () => {
+    afilters.quick = quick.value;
+    if (quick.value === 'all') { afilters.from = ''; afilters.to = ''; }
+    else if (quick.value) {
+      afilters.from = dayKey(Date.now() - (Number(quick.value) - 1) * DAY); afilters.to = '';
+    }
+    renderArchive();
+  });
+
+  const catRow = h('div.frow');
+  const usedCats = [...new Set(STATE.notes.filter(n => n.archived).map(n => n.catId || 'none'))];
+  for (const cid of usedCats) {
+    const cat = cid === 'none' ? null : catById(cid);
+    const pal = cat ? palById(cat.color) : null;
+    const on = afilters.cats.has(cid);
+    catRow.append(h('button.chip' + (on ? '.on' : ''), { onclick: e => {
+      if (afilters.cats.has(cid)) afilters.cats.delete(cid); else afilters.cats.add(cid);
+      renderArchive();
+    } },
+      pal ? h('span.dot', { style: { background: pal.bg, border: '1px solid ' + pal.deep } }) : null,
+      cat ? cat.name : 'No category'));
+  }
+
+  inner.append(h('div.filters', {},
+    h('div.frow', {}, qIn, quick, fromIn, h('span', { style: { color: 'var(--ink3)', fontSize: '12px' } }, 'to'), toIn),
+    usedCats.length ? catRow : null));
+
+  // --- list ---
+  const countEl = h('div.count');
+  const listEl = h('div.alist');
+  inner.append(countEl, listEl);
+
+  function refresh() {
+    const items = archivedNotes();
+    countEl.textContent = items.length === 1 ? '1 task' : items.length + ' tasks';
+    listEl.innerHTML = '';
+    if (!items.length) {
+      listEl.append(h('div.empty', { style: { gridColumn: '1/-1' } },
+        STATE.notes.some(n => n.archived) ? 'Nothing matches these filters.' : 'Nothing archived yet. Go check something off.'));
+      return;
+    }
+    for (const n of items) listEl.append(archiveCard(n));
+  }
+  refresh();
+
+  // --- summarize ---
+  inner.append(buildSummarySection());
+}
+
+function archiveCard(n) {
+  const cat = catById(n.catId);
+  const days = Math.max(0, Math.round((n.completedAt - n.createdAt) / DAY));
+  const card = h('div.acard', {},
+    h('div.atop', {},
+      h('span.atick', { innerHTML: TICK_SVG.replace('class="tickpath"', 'class="tickpath" style="stroke-dashoffset:0"') }),
+      h('div.atitle', {}, n.title || 'Untitled')),
+    h('div.adates', {}, 'Created ' + fmtDY(n.createdAt) + '  →  Done ' + fmtDY(n.completedAt) + (days ? '  (' + days + (days === 1 ? ' day)' : ' days)') : '  (same day)')),
+    h('div.abot', {},
+      cat ? h('span.minichip', {}, h('span.dot', { style: { background: palById(cat.color).bg, border: '1px solid ' + palById(cat.color).deep } }), cat.name) : null,
+      n.steps.length ? h('span.minichip', {}, n.steps.filter(s => s.done).length + '/' + n.steps.length + ' steps') : null,
+      h('span.spacer'),
+      h('button.btn.ghost.small', { title: 'Back to the canvas, unchecked', onclick: () => {
+        undoableAction('“' + (n.title || 'Untitled') + '” is back on the canvas', () => { n.archived = false; n.completedAt = null; });
+        completionChanged();
+      } }, 'Restore'),
+      h('button.btn.danger.small', { onclick: () => {
+        undoableAction('Deleted from archive', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
+        completionChanged();
+      } }, 'Delete')));
+  return card;
+}
+
+/* ---------- summaries (prompt presets, Google AI with local fallback) ---------- */
+function archiveDataFor(items) {
+  return items.map(n => ({
+    title: n.title, category: (catById(n.catId) || {}).name || null,
+    created: dayKey(n.createdAt), completed: dayKey(n.completedAt),
+    steps: n.steps.length, stepsDone: n.steps.filter(s => s.done).length,
+  }));
+}
+function buildSummarySection() {
+  const prompts = STATE.prompts.filter(p => p.scope !== 'dashboard');
+  const sel = h('select.input.grow', {}, prompts.map(p => h('option', { value: p.id }, p.name)));
+  const out = h('div.aiout');
+  const run = h('button.btn.primary.small', { onclick: async () => {
+    const items = archivedNotes();
+    const p = STATE.prompts.find(x => x.id === sel.value);
+    out.classList.add('show'); out.textContent = 'Summarizing…'; run.disabled = true;
+    out.textContent = await summarize(p, archiveDataFor(items), () => sampleSummary(items, p));
+    run.disabled = false;
+  } }, 'Summarize');
+  return h('div.aisec', {},
+    h('div.sechead', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
+      h('span.label', {}, 'AI summary of the tasks above'),
+      h('button.btn.ghost.small', { onclick: () => openPromptsModal('archive') }, 'Manage prompts')),
+    h('div.frow', {}, sel, run),
+    out);
+}
+function sampleSummary(items, prompt) {
+  if (!items.length) return 'No tasks match the current filters — nothing to summarize.';
+  const byCat = {};
+  for (const n of items) {
+    const c = catById(n.catId);
+    const k = c ? c.name : 'No category';
+    byCat[k] = (byCat[k] || 0) + 1;
+  }
+  const catLines = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => '  • ' + k + ': ' + v).join('\n');
+  const span = fmtDY(items[items.length - 1].completedAt) + ' to ' + fmtDY(items[0].completedAt);
+  const byDay = {};
+  for (const n of items) { const k = dayKey(n.completedAt); byDay[k] = (byDay[k] || 0) + 1; }
+  const best = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
+  const avgDays = items.reduce((a, n) => a + (n.completedAt - n.createdAt), 0) / items.length / DAY;
+  return 'Using prompt: “' + (prompt ? prompt.name : '—') + '”\n\n'
+    + 'You completed ' + items.length + ' task' + (items.length === 1 ? '' : 's') + ' (' + span + ').\n\n'
+    + 'By category:\n' + catLines + '\n\n'
+    + 'Busiest day: ' + fmtDY(new Date(best[0] + 'T12:00').getTime()) + ' (' + best[1] + ' done)\n'
+    + 'Average time from created to done: ' + (avgDays < 1 ? 'same day' : avgDays.toFixed(1) + ' days');
+}
+
+function openPromptsModal(scope) {
+  scope = scope || 'archive';
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const listEl = h('div.plist');
+  const body = h('div.sbody', {},
+    h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '4px' } }, 'Summary prompts'),
+    h('div.sub', { style: { color: 'var(--ink2)', marginBottom: '14px' } },
+      scope === 'dashboard' ? 'Pre-written instructions the AI uses when reviewing your goal keeping.' : 'Pre-written instructions the AI uses when summarizing your archive.'),
+    listEl);
+  function refresh() {
+    listEl.innerHTML = '';
+    for (const p of STATE.prompts.filter(x => (x.scope || 'archive') === scope)) listEl.append(promptItem(p, refresh, scope));
+    listEl.append(h('button.btn.small', { style: { alignSelf: 'flex-start' }, onclick: () => {
+      STATE.prompts.push({ id: uid(), scope, name: 'New prompt', text: '' });
+      save(); refresh();
+      const items = $$('.pitem', listEl);
+      const last = items[items.length - 1];
+      const editBtn = $('.btn.ghost.small', last);
+      if (editBtn) editBtn.click();
+    } }, '＋ Add prompt'));
+  }
+  refresh();
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {}, h('span'), h('button.btn.small', { onclick: closeModal }, 'Done')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+}
+function promptItem(p, refresh, scope) {
+  const item = h('div.pitem');
+  const head = h('div.phead', {},
+    h('span.pname', {}, p.name),
+    h('button.btn.ghost.small', { onclick: startEdit }, 'Edit'),
+    h('button.xbtn', { title: 'Delete prompt', onclick: () => {
+      undoableAction('Prompt deleted', () => { STATE.prompts = STATE.prompts.filter(x => x.id !== p.id); });
+      openPromptsModal(scope);
+    } }, '✕'));
+  item.append(head, h('div.ptext', {}, p.text || 'No instructions yet.'));
+  function startEdit() {
+    item.innerHTML = '';
+    const nameIn = h('input.input', { value: p.name, maxLength: 60 });
+    const textIn = h('textarea.input', { value: p.text, placeholder: 'What should the AI do with the filtered tasks?' });
+    item.append(h('div.pedit', {}, nameIn, textIn,
+      h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
+        h('button.btn.ghost.small', { onclick: refresh }, 'Cancel'),
+        h('button.btn.primary.small', { onclick: () => {
+          p.name = nameIn.value.trim() || 'Untitled prompt';
+          p.text = textIn.value.trim();
+          save(); refresh();
+        } }, 'Save'))));
+    nameIn.focus(); nameIn.select();
+  }
+  return item;
+}
+
+/* ---------- goals & wishlist ---------- */
+function renderGoals() {
+  const inner = $('#goalsInner');
+  inner.innerHTML = '';
+  inner.append(h('h1', {}, 'Goals'),
+    h('div.sub', {}, 'Daily goals up top, checked off sheet-style. Bigger targets and rewards below. The Dashboard keeps score.'));
+
+  inner.append(renderHabitSheet());
+
+  const goalsCol = h('div');
+  const wishCol = h('div');
+  inner.append(h('div.gsplit', {}, goalsCol, wishCol));
+
+  // --- goals ---
+  goalsCol.append(h('div.label', { style: { marginBottom: '10px' } }, 'Task goals'));
+  if (!STATE.goals.length) goalsCol.append(h('div.empty', {}, 'No goals yet — set your first pace below.'));
+  for (const g of STATE.goals) {
+    const nDone = goalCount(g), met = nDone >= g.target, pct = clamp(nDone / g.target * 100, 0, 100);
+    const cat = catById(g.catId);
+    goalsCol.append(h('div.gcard' + (met ? '.donegoal' : ''), {},
+      h('div.ghead', {},
+        h('span.gname', {}, g.name),
+        met ? h('span.gdone-tag', {}, '✓ reached') : null,
+        h('button.pinbtn' + (g.pinned ? '.on' : ''), { title: g.pinned ? 'Unpin from top bar' : 'Pin to top bar', innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24"><g transform="rotate(38 12 12)"><path d="M12 3c-2.6 0-4.4 1.6-4.4 3.9 0 1.5.8 2.6 1.9 3.2l-.9 4.4h6.8l-.9-4.4c1.1-.6 1.9-1.7 1.9-3.2C16.4 4.6 14.6 3 12 3z" fill="currentColor"/><rect x="11.2" y="14.2" width="1.6" height="6.6" rx=".8" fill="currentColor"/></g></svg>', onclick: () => { g.pinned = !g.pinned; save(); renderGoals(); renderMeters(); } }),
+        h('button.xbtn', { title: 'Delete goal', onclick: () => undoableAction('Goal deleted', () => { STATE.goals = STATE.goals.filter(x => x.id !== g.id); }) }, '✕')),
+      h('div.gmeta', {}, 'Finish ' + g.target + ' task' + (g.target === 1 ? '' : 's') + ' ' + PERIOD_LABEL[g.period] + (cat ? ' in “' + cat.name + '”' : '')),
+      h('div.gbar', {},
+        h('div.gtrack', {}, h('div.gfill' + (met ? '.full' : ''), { style: { width: pct + '%' } })),
+        h('span.gnum', {}, nDone + ' / ' + g.target))));
+  }
+  // new goal form
+  const gName = h('input.input.grow', { placeholder: 'Goal name (e.g. Clear the inbox pile)', maxLength: 60 });
+  const gTarget = h('input.input', { type: 'number', min: 1, max: 999, value: 5, style: { width: '76px' }, title: 'How many tasks' });
+  const gPeriod = h('select.input', {}, [['day', 'per day'], ['week', 'per week'], ['month', 'per month'], ['all', 'all-time']].map(([v, l]) => h('option', { value: v, selected: v === 'week' }, l)));
+  const gCat = h('select.input', {}, h('option', { value: '' }, 'any category'), STATE.cats.map(c => h('option', { value: c.id }, 'in ' + c.name)));
+  goalsCol.append(h('div.newform', {},
+    h('div.label', {}, 'New goal'),
+    h('div.frow', {}, gName),
+    h('div.frow', {}, gTarget, gPeriod, gCat,
+      h('button.btn.primary.small', { onclick: () => {
+        if (!gName.value.trim()) { gName.focus(); return; }
+        STATE.goals.push({ id: uid(), name: gName.value.trim(), target: clamp(Number(gTarget.value) || 1, 1, 999), period: gPeriod.value, catId: gCat.value || null, pinned: STATE.goals.filter(x => x.pinned).length < 3, createdAt: Date.now() });
+        save(); renderGoals(); renderMeters();
+      } }, 'Add'))));
+
+  // --- wishlist ---
+  wishCol.append(h('div.label', { style: { marginBottom: '10px' } }, 'Wishlist: rewards you’ve promised yourself'));
+  if (!STATE.wishes.length) wishCol.append(h('div.empty', {}, 'Nothing on the wishlist yet.'));
+  for (const w of STATE.wishes) {
+    const goal = STATE.goals.find(g => g.id === w.goalId);
+    const unlocked = !goal || goalMet(goal);
+    let stateEl;
+    if (w.claimedAt) stateEl = h('span.wish-state', { style: { color: 'var(--ink3)' } }, 'Claimed ' + fmtD(w.claimedAt) + ' 🎉');
+    else if (!goal) stateEl = h('span.wish-state.unlocked', {}, 'Yours whenever, no goal attached');
+    else if (unlocked) stateEl = h('span.wish-state.unlocked', {}, 'Unlocked by “' + goal.name + '”!');
+    else stateEl = h('span.wish-state.locked', {}, (goal.target - goalCount(goal)) + ' more task' + (goal.target - goalCount(goal) === 1 ? '' : 's') + ' to unlock (' + goal.name + ')');
+    wishCol.append(h('div.gcard' + (w.claimedAt ? '.claimed' : ''), {},
+      h('div.ghead', {},
+        h('span.gname', {}, w.text),
+        !w.claimedAt && unlocked ? h('button.btn.primary.small', { onclick: e => {
+          w.claimedAt = Date.now(); save();
+          const r = e.target.getBoundingClientRect();
+          confetti(r.left, r.top);
+          renderGoals();
+        } }, 'Claim it') : null,
+        h('button.xbtn', { title: 'Delete', onclick: () => undoableAction('Wish deleted', () => { STATE.wishes = STATE.wishes.filter(x => x.id !== w.id); }) }, '✕')),
+      h('div.gmeta', {}, stateEl)));
+  }
+  const wText = h('input.input.grow', { placeholder: 'Treat yourself to… (e.g. that overpriced sandwich)', maxLength: 80 });
+  const wGoal = h('select.input', {}, h('option', { value: '' }, 'no goal, just a wish'), STATE.goals.map(g => h('option', { value: g.id }, 'unlocks with: ' + g.name)));
+  wishCol.append(h('div.newform', {},
+    h('div.label', {}, 'New wish'),
+    h('div.frow', {}, wText),
+    h('div.frow', {}, wGoal,
+      h('button.btn.primary.small', { onclick: () => {
+        if (!wText.value.trim()) { wText.focus(); return; }
+        STATE.wishes.push({ id: uid(), text: wText.value.trim(), goalId: wGoal.value || null, claimedAt: null, createdAt: Date.now() });
+        save(); renderGoals();
+      } }, 'Add'))));
+}
+
+/* ---------- boot ---------- */
+function boot() {
+  STATE = loadState();
+  storeSet(STORE_KEY, storeGet(STORE_KEY) || JSON.stringify(STATE)); // probe storage
+  for (const g of STATE.goals) metBefore[g.id] = goalMet(g);
+  wireMenu();
+  wireCanvas();
+  wireTabs();
+  renderMeters(); renderCanvas();
+  // parse any OAuth redirect BEFORE the router touches the URL hash
+  handleAuthRedirect().then(() => {
+    window.addEventListener('hashchange', route);
+    route();
+    initSync();
+  });
+  if (!storageOK) {
+    const sn = $('#storageNote');
+    sn.style.display = 'block';
+    sn.innerHTML = '';
+    sn.append(
+      h('button', { onclick: () => sn.style.display = 'none', 'aria-label': 'Dismiss' }, '✕'),
+      h('div', {}, h('b', {}, 'Preview mode: '), 'this environment can’t store data between visits. Use ⋯ → Export to keep a backup, or run Dayu from its own page for full persistence.'));
+  }
+  // scroll the board so seeded content is in view
+  const b = $('#board');
+  b.scrollLeft = 40; b.scrollTop = 0;
+}
+boot();
+
+</script>
