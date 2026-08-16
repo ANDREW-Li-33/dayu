@@ -100,7 +100,9 @@ main{flex:1;min-height:0;position:relative}
   position:relative;width:2600px;height:1800px;
   background-image:radial-gradient(var(--dots) 1.2px,transparent 1.2px);
   background-size:24px 24px;
+  cursor:grab;
 }
+#field.panning{cursor:grabbing;user-select:none}
 #field.drawing{cursor:crosshair}
 .hint{
   position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
@@ -108,8 +110,8 @@ main{flex:1;min-height:0;position:relative}
 }
 .hint b{color:var(--ink2)}
 
-/* zones */
-.zone{position:absolute;border-radius:14px;z-index:1}
+/* zones: the area itself lets pointers through so the canvas can be panned across it */
+.zone{position:absolute;border-radius:14px;z-index:1;pointer-events:none}
 .zone .zbg{position:absolute;inset:0;border-radius:14px;opacity:.10;pointer-events:none}
 .zone .zborder{position:absolute;inset:0;border-radius:14px;border:1.5px dashed;opacity:.55;pointer-events:none}
 .zone .zhead{
@@ -117,13 +119,14 @@ main{flex:1;min-height:0;position:relative}
   display:flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;
   background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
   font-size:12px;font-weight:700;cursor:grab;user-select:none;white-space:nowrap;
+  pointer-events:auto;
 }
 .zone .zhead:active{cursor:grabbing}
 .zone .zcount{font-weight:600;color:var(--ink3);font-variant-numeric:tabular-nums}
 .zone .zdel{width:16px;height:16px;border-radius:50%;font-size:11px;line-height:1;color:var(--ink3);display:none;align-items:center;justify-content:center}
 .zone .zhead:hover .zdel{display:flex}
 .zone .zdel:hover{background:var(--danger-soft);color:var(--danger)}
-.zone .zresize{position:absolute;right:-6px;bottom:-6px;width:16px;height:16px;cursor:nwse-resize;border-radius:4px}
+.zone .zresize{position:absolute;right:-6px;bottom:-6px;width:16px;height:16px;cursor:nwse-resize;border-radius:4px;pointer-events:auto}
 .zone .zresize::after{content:"";position:absolute;right:5px;bottom:5px;width:8px;height:8px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);border-radius:1px}
 #drawPreview{position:absolute;border:1.5px dashed var(--accent);background:var(--accent-soft);border-radius:14px;z-index:5;display:none;pointer-events:none}
 
@@ -347,6 +350,28 @@ main{flex:1;min-height:0;position:relative}
 .zonepop .cdot.on{border-color:var(--ink)}
 .empty{color:var(--ink3);text-align:center;padding:40px 20px;font-size:14px}
 
+/* ---------- welcome gate ---------- */
+#welcome{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+#welcome .woverlay{position:absolute;inset:0;background:var(--paper);opacity:.97}
+#welcome .wcard{
+  position:relative;width:min(420px,100%);background:var(--surface);border:1px solid var(--line);
+  border-radius:20px;box-shadow:var(--shadow-big);padding:34px 32px 24px;text-align:center;
+  animation:sheetin .22s cubic-bezier(.2,.9,.3,1.2);
+}
+#welcome .wpin{font-size:34px;line-height:1}
+#welcome h1{font-size:30px;font-weight:800;letter-spacing:-.03em;margin:8px 0 6px}
+#welcome .wlede{color:var(--ink2);font-size:14px;line-height:1.5;margin-bottom:22px;text-wrap:balance}
+#welcome .wbtn{width:100%;justify-content:center;padding:11px 16px;font-size:14.5px;border-radius:11px}
+#welcome .gmark{
+  display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;
+  background:var(--accent-ink);color:var(--accent);font-weight:800;font-size:12.5px;flex:0 0 auto;
+}
+#welcome .werr{color:var(--danger);font-size:12px;font-weight:600;line-height:1.45;margin-top:12px}
+#welcome .werr:empty{display:none}
+#welcome .wfine{color:var(--ink3);font-size:11.5px;line-height:1.5;margin-top:12px}
+#welcome .wskip{margin-top:16px;color:var(--ink3);font-size:12.5px;font-weight:600;text-decoration:underline;text-underline-offset:3px}
+#welcome .wskip:hover{color:var(--ink)}
+
 /* ---------- notice bar & sync chip ---------- */
 #noticeBar{flex:0 0 auto;display:flex;flex-direction:column;z-index:35}
 .notice{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:12.5px;font-weight:600;background:var(--danger-soft);border-bottom:1px solid var(--line)}
@@ -420,6 +445,22 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
   .tabs .tab{padding:6px 8px}
   #meters .meter{min-width:64px}
   .meter .mlabel{max-width:70px}
+}
+@media (max-width:620px){
+  #topbar{gap:10px;padding:0 10px}
+  .tabs .tab{padding:6px 6px;font-size:13px}
+  #meters{gap:8px}
+  #meters .meter{min-width:52px}
+  .meter .mlabel{max-width:54px;font-size:9px}
+  #syncChip .stext{display:none}
+  #syncChip{padding:5px 7px}
+}
+@media (max-width:470px){
+  #topbar{gap:6px;padding:0 8px}
+  .wordmark span{display:none}
+  #meters{display:none}          /* the Goals and Dashboard pages carry the same numbers */
+  .tabs{margin-right:auto}
+  .tabs .tab{padding:6px 5px;font-size:12.5px}
 }
 </style>
 
@@ -564,7 +605,11 @@ function save() {
   schedulePush();
 }
 function blankState() {
-  return { v: 2, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10, meta: { updatedAt: Date.now() } };
+  return {
+    v: 3, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
+    ai: { key: '', model: 'gemini-flash-latest', lastVersion: '' },
+    meta: { updatedAt: Date.now() },
+  };
 }
 function dashPromptSeeds() {
   return [
@@ -572,13 +617,37 @@ function dashPromptSeeds() {
     { id: uid(), scope: 'dashboard', name: 'Pep talk', text: 'Review my goal tracking and give me a short, honest pep talk: call out real wins and streaks, then one nudge for tomorrow.' },
   ];
 }
-function migrate(s) {
+// adoptLocal is true ONLY for the board loaded out of this browser's own storage.
+// A pulled remote board or an imported backup belongs to some other context, and must
+// never inherit a key left behind by whoever used this browser last.
+function migrate(s, adoptLocal) {
   if (!s.meta) s.meta = { updatedAt: Date.now() };
   if (!Array.isArray(s.habits)) s.habits = [];
+  if (!Array.isArray(s.prompts)) s.prompts = [];
+  if (!Array.isArray(s.notes)) s.notes = [];
   for (const p of s.prompts) if (!p.scope) p.scope = 'archive';
   if ((s.v || 1) < 2) {
     s.prompts.push(...dashPromptSeeds());
     s.v = 2;
+  }
+  if (!s.ai || typeof s.ai !== 'object') s.ai = { key: '', model: '', lastVersion: '' };
+  if (typeof s.ai.key !== 'string') s.ai.key = '';
+  if (typeof s.ai.lastVersion !== 'string') s.ai.lastVersion = '';
+  if (typeof s.ai.model !== 'string' || !s.ai.model) s.ai.model = 'gemini-flash-latest';
+  // v3: the AI key moved out of this-browser-only storage and into the synced account,
+  // so it is entered once rather than on every device. This runs exactly once.
+  if ((s.v || 1) < 3) {
+    if (adoptLocal && typeof CFG !== 'undefined' && CFG && (CFG.gemKey || CFG.gemModel)) {
+      if (!s.ai.key && CFG.gemKey) s.ai.key = CFG.gemKey;
+      if (CFG.gemModel && !/^gemini-2\./.test(CFG.gemModel)) s.ai.model = CFG.gemModel;
+      CFG.gemKey = ''; CFG.gemModel = '';   // forget it, so it can never reach another account
+      if (typeof saveCfg === 'function') saveCfg();
+    }
+    // Google retired the 2.x ids for accounts created after their cutoff. Correct a stale
+    // saved default once; afterwards the user's own pick is left alone and an unusable
+    // model reports itself through the notice bar instead of being silently overridden.
+    if (/^gemini-2\./.test(s.ai.model)) { s.ai.model = 'gemini-flash-latest'; s.ai.lastVersion = ''; }
+    s.v = 3;
   }
   return s;
 }
@@ -613,10 +682,14 @@ function seedState() {
   );
   return s;
 }
+let returningUser = false; // had a board in this browser before this visit
 function loadState() {
   const raw = storeGet(STORE_KEY) || storeGet(LEGACY_STORE_KEY);
   if (raw) {
-    try { const s = JSON.parse(raw); if (s && Array.isArray(s.notes)) return migrate(s); } catch (e) { /* fall through */ }
+    try {
+      const s = JSON.parse(raw);
+      if (s && Array.isArray(s.notes)) { returningUser = true; return migrate(s, true); }
+    } catch (e) { /* fall through to a fresh board */ }
   }
   return seedState();
 }
@@ -731,7 +804,10 @@ function renderAll() { renderMeters(); renderCanvas(); go(pageName); }
 
 /* ---------- menu: export / import / reset ---------- */
 async function exportBackup() {
-  const data = JSON.stringify(STATE, null, 2);
+  // A backup is a file that travels. Keep the API key out of it and carry only the choice of model.
+  const payload = JSON.parse(JSON.stringify(STATE));
+  payload.ai = { key: '', model: (STATE.ai && STATE.ai.model) || 'gemini-flash-latest', lastVersion: '' };
+  const data = JSON.stringify(payload, null, 2);
   const filename = 'dayu-backup-' + dayKey(Date.now()) + '.json';
   try {
     const dl = window.claude && claude.use ? await claude.use('downloads') : null;
@@ -754,7 +830,10 @@ function importBackup(file) {
       const s = JSON.parse(rd.result);
       if (!s || !Array.isArray(s.notes)) throw new Error('bad shape');
       const snap = snapshot();
-      STATE = migrate(s); save(); renderAll();
+      const keptKey = (STATE.ai && STATE.ai.key) || '';
+      STATE = migrate(s, false);
+      if (!STATE.ai.key && keptKey) STATE.ai.key = keptKey; // backups carry no key; keep the one in use
+      save(); renderAll();
       toast('Backup imported', () => restore(snap));
     } catch (e) { toast('That file doesn’t look like a Dayu backup'); }
   };
@@ -771,7 +850,11 @@ function wireMenu() {
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
   $('#mReset').addEventListener('click', () => {
     pop.classList.remove('open');
-    undoableAction('Board cleared', () => { STATE = blankState(); });
+    undoableAction('Board cleared. Your account and AI key are untouched', () => {
+      const keepAi = STATE.ai;
+      STATE = blankState();
+      STATE.ai = keepAi;
+    });
   });
 }
 
@@ -794,7 +877,11 @@ let CFG = { gemKey: '', gemModel: 'gemini-flash-latest', sbUrl: '', sbAnon: '', 
   if (/^gemini-2\./.test(CFG.gemModel || '')) CFG.gemModel = 'gemini-flash-latest'; // retired for new accounts
 })();
 function saveCfg() { storeSet(CFG_KEY, JSON.stringify(CFG)); }
-function aiConfigured() { return !!CFG.gemKey; }
+// The AI key and model live in the synced state, so they follow the account to every device.
+const AI_FALLBACK = { key: '', model: 'gemini-flash-latest', lastVersion: '' };
+let cachedModels = null; // model names fetched with the user's own key, this session only
+function aiCfg() { return (STATE && STATE.ai) ? STATE.ai : AI_FALLBACK; }
+function aiConfigured() { return !!aiCfg().key; }
 
 /* ---------- notice bar (persistent in-app notifications) ---------- */
 function showNotice(id, msg) {
@@ -812,14 +899,15 @@ function clearNotice(id) { const n = $('.notice[data-id="' + id + '"]'); if (n) 
 /* ---------- Google AI (Gemini via AI Studio key) ---------- */
 const GEM_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 async function gemini(prompt) {
-  if (!CFG.gemKey) throw { code: 'nokey' };
-  const model = CFG.gemModel || 'gemini-flash-latest';
+  const ai = aiCfg();
+  if (!ai.key) throw { code: 'nokey' };
+  const model = ai.model || 'gemini-flash-latest';
   const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } };
   let r;
   try {
     r = await fetch(GEM_BASE + encodeURIComponent(model) + ':generateContent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': CFG.gemKey },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': ai.key },
       body: JSON.stringify(body),
     });
   } catch (e) { throw { code: 'net' }; }
@@ -838,19 +926,54 @@ async function gemini(prompt) {
     throw { code: 'bad', msg };
   }
   if (r.status === 503) throw { code: 'busy' };
+  if (r.status === 404) {
+    let msg = '';
+    try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* ignore */ }
+    showNotice('gem-model', 'That model is not available to this key: ' + (msg || model) + ' Pick another in Settings, or press Refresh list to see what your key can use.');
+    throw { code: 'model' };
+  }
   if (!r.ok) throw { code: 'http' + r.status };
   const j = await r.json();
   let text = '';
   try { text = j.candidates[0].content.parts.map(p => p.text || '').join(''); } catch (e) { /* empty */ }
   if (!text.trim()) throw { code: 'empty' };
-  clearNotice('gem-key'); clearNotice('gem-quota');
+  // Record which concrete version answered, since the -latest aliases move over time.
+  // Re-read the config: a sync pull may have replaced STATE while this request was in flight.
+  const cur = aiCfg();
+  if (j.modelVersion && j.modelVersion !== cur.lastVersion) { cur.lastVersion = j.modelVersion; save(); }
+  clearNotice('gem-key'); clearNotice('gem-quota'); clearNotice('gem-model');
   return text.trim();
+}
+// Ask the key which models it may actually use, so the picker shows real options.
+async function listGeminiModels() {
+  const ai = aiCfg();
+  if (!ai.key) throw { code: 'nokey' };
+  let r;
+  try {
+    r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': ai.key } });
+  } catch (e) { throw { code: 'net' }; }
+  if (r.status === 429) throw { code: 'quota' };
+  if (r.status === 400 || r.status === 401 || r.status === 403) throw { code: 'key' };
+  if (!r.ok) throw { code: 'http' + r.status };
+  const j = await r.json();
+  return (j.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0)
+    .map(m => String(m.name || '').replace(/^models\//, ''))
+    .filter(n => n && !/tts|image|robotics|lyria|computer-use|embedding|deep-research|antigravity|omni|banana/i.test(n))
+    .sort();
+}
+function modelLabel() {
+  const ai = aiCfg();
+  const sel = ai.model || 'gemini-flash-latest';
+  return ai.lastVersion && /latest/.test(sel) ? sel + ' (' + ai.lastVersion + ')' : (ai.lastVersion || sel);
 }
 function aiFailNote(err) {
   const c = err && err.code;
   if (c === 'quota') return 'Google AI limit reached, so this is the locally computed fallback.';
   if (c === 'key') return 'Google AI key was rejected (see Settings), so this is the locally computed fallback.';
   if (c === 'busy') return 'Google AI is overloaded right now, so this is the locally computed fallback.';
+  if (c === 'model') return 'That model is not available to your key, so this is the locally computed fallback. Pick another in Settings.';
+  if (c === 'nokey') return 'No AI key saved yet, so this is the locally computed fallback.';
   if (c === 'net') return storageOK
     ? 'Couldn’t reach Google AI (offline?), so this is the locally computed fallback.'
     : 'This preview page can’t reach the internet. AI works when Dayu runs locally or on its own hosting.';
@@ -860,8 +983,9 @@ function aiFailNote(err) {
 async function summarize(p, data, sampleFn) {
   if (aiConfigured()) {
     try {
-      return await gemini((p ? p.text : 'Summarize this.') + '\n\nDATA (JSON):\n' + JSON.stringify(data)
+      const out = await gemini((p ? p.text : 'Summarize this.') + '\n\nDATA (JSON):\n' + JSON.stringify(data)
         + '\n\nReply in plain text under 200 words. No markdown formatting, no headers. Never use em dashes.');
+      return out + '\n\nWritten by ' + modelLabel();
     } catch (err) { return sampleFn() + '\n\n' + aiFailNote(err); }
   }
   return sampleFn() + '\n\nSample summary, computed locally. Add your Google AI Studio key in Settings (⋯ menu) to use your saved prompts for real.';
@@ -929,18 +1053,23 @@ async function sbSignIn(email, pass) {
   syncNow();
   return true;
 }
-/* ---- Google sign-in (PKCE, no library) ---- */
+/* ---- Google sign-in (PKCE, no library) ----
+   Returns {ok:true} when the browser is being handed to Google, or {ok:false, message}
+   so a caller such as the welcome card can show the reason in its own surface. */
+function authFail(id, message) { showNotice(id, message); return { ok: false, message }; }
 async function signInWithGoogle() {
-  if (!sbConfigured()) { showNotice('sb-cfg', 'Add the Supabase project URL in Settings first.'); return; }
-  if (location.protocol === 'file:') { showNotice('sb-file', 'Google sign-in needs the app on an http address: run serve.ps1 or use the hosted page.'); return; }
+  if (!sbConfigured()) return authFail('sb-cfg', 'Add the Supabase project URL in Settings first.');
+  if (location.protocol === 'file:') return authFail('sb-file', 'Google sign-in needs the app on an http address: run serve.ps1 or use the hosted page.');
   // Check the provider is on, so a disabled provider shows a message here instead of a raw error page.
+  // An unreachable service also stops here rather than navigating to a dead address.
   try {
     const s = await fetch(CFG.sbUrl + '/auth/v1/settings', { headers: { apikey: CFG.sbAnon } }).then(x => x.json());
     if (s && s.external && s.external.google === false) {
-      showNotice('sb-google', 'Google sign-in is not switched on for this project yet. Use email and password for now, or enable the Google provider in Supabase (see SETUP.md).');
-      return;
+      return authFail('sb-google', 'Google sign-in is not switched on for this project yet. Use email and password for now, or enable the Google provider in Supabase (see SETUP.md).');
     }
-  } catch (e) { /* if the check itself fails, continue and let the redirect report */ }
+  } catch (e) {
+    return authFail('sb-net', 'Cannot reach the sign-in service from this page. If this is the preview page, open Dayu from its own address instead.');
+  }
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   const verifier = b64url(bytes);
@@ -952,6 +1081,7 @@ async function signInWithGoogle() {
   storeSet('dayu-oauth-pending', JSON.stringify({ at: Date.now(), redirect }));
   location.href = CFG.sbUrl + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(redirect)
     + '&code_challenge=' + challenge + '&code_challenge_method=s256';
+  return { ok: true };
 }
 // Turn provider jargon into something a person can act on.
 function explainAuthError(raw) {
@@ -1043,26 +1173,34 @@ async function handleAuthRedirect() {
   }
 }
 async function sbRefreshToken() {
+  let r;
   try {
-    const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=refresh_token', {
+    r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=refresh_token', {
       method: 'POST',
       headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh_token: CFG.sbRefresh }),
     });
-    if (!r.ok) throw new Error('refresh failed');
-    const j = await r.json();
-    SB.access = j.access_token || null;
-    if (j.refresh_token) { CFG.sbRefresh = j.refresh_token; saveCfg(); }
-    return !!SB.access;
   } catch (e) {
+    // No network. Being offline is not a reason to sign someone out; keep the token.
+    syncStatus('off');
+    return false;
+  }
+  if (r.status >= 500 || r.status === 429) { syncStatus('off', 'Sync service busy'); return false; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.access_token) {
+    // The server genuinely rejected this token, so it is spent.
     SB.access = null; CFG.sbRefresh = ''; saveCfg();
     syncStatus('signin');
     showNotice('sb-signin', 'Sync sign-in expired. Open Settings (⋯ menu) and sign in again.');
     return false;
   }
+  SB.access = j.access_token;
+  if (j.refresh_token) { CFG.sbRefresh = j.refresh_token; saveCfg(); }
+  return true;
 }
 function sbSignOut() {
   SB.access = null; CFG.sbRefresh = ''; CFG.sbEmail = '';
+  storeSet(WELCOME_KEY, '1'); // someone who found the sign-out button does not need the intro again
   saveCfg(); syncStatus('signin');
 }
 function schedulePush() {
@@ -1089,8 +1227,10 @@ async function syncNow() {
     const remote = rows && rows[0];
     const localTs = (STATE.meta && STATE.meta.updatedAt) || 0;
     const remoteTs = remote ? Date.parse(remote.updated_at) : 0;
-    if (remote && remoteTs > localTs + 500 && !modalNoteId) {
-      STATE = migrate(remote.data);
+    // Never swap the board out from under an open sheet: the user may be mid-edit in it.
+    const sheetOpen = modalNoteId || $('#modalRoot').classList.contains('open');
+    if (remote && remoteTs > localTs + 500 && !sheetOpen) {
+      STATE = migrate(remote.data, false);
       STATE.meta.updatedAt = remoteTs;
       storeSet(STORE_KEY, JSON.stringify(STATE));
       renderAll();
@@ -1122,6 +1262,70 @@ function initSync() {
   });
 }
 
+/* ---------- welcome gate for first-time visitors ---------- */
+const WELCOME_KEY = 'dayu-welcomed';
+function signedIn() { return !!(SB.access || CFG.sbRefresh); }
+function hasOwnWork() {
+  // Real use of this board: something finished, or a daily goal ticked.
+  return STATE.notes.some(n => n.archived || n.completedAt)
+    || STATE.habits.some(hb => Object.keys(hb.days || {}).length > 0);
+}
+function maybeShowWelcome() {
+  if (signedIn()) return;
+  if (!sbConfigured()) return;                 // nothing to sign in to
+  if (storeGet(WELCOME_KEY) === '1') return;   // they already chose to look around
+  if ($('.notice')) return;                    // an explanation is already on screen
+  if (returningUser && hasOwnWork()) return;   // do not interrupt a board someone is using
+  showWelcome();
+}
+function showWelcome() {
+  if ($('#welcome')) return;
+  const app = $('#app');
+  const dismiss = remember => {
+    if (remember) storeSet(WELCOME_KEY, '1');
+    const w = $('#welcome');
+    if (w) w.remove();
+    if (app) { app.inert = false; app.removeAttribute('aria-hidden'); }
+  };
+  const werr = h('p.werr');
+  const glabel = h('span', {}, 'Continue with Google');
+  const gbtn = h('button.btn.primary.wbtn', { onclick: async () => {
+    gbtn.disabled = true; glabel.textContent = 'Opening Google…'; werr.textContent = '';
+    const res = await signInWithGoogle();
+    if (res && res.ok) return;                 // the browser is leaving for Google
+    // Still here, so sign-in could not start. Say why inside the card, since the
+    // notice bar sits behind this overlay, and let them try again.
+    gbtn.disabled = false; glabel.textContent = 'Continue with Google';
+    werr.textContent = (res && res.message) || 'Sign-in could not start. Please try again.';
+  } },
+    h('span.gmark', { 'aria-hidden': 'true' }, 'G'),
+    glabel);
+
+  const card = h('div.wcard', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Welcome to Dayu' },
+    h('div.wpin', { 'aria-hidden': 'true' }, '📌'),
+    h('h1', {}, 'Dayu'),
+    h('p.wlede', {}, 'A canvas for the things you mean to do. Pin them, cluster them, knock them down.'),
+    gbtn,
+    werr,
+    h('p.wfine', {}, 'Signing in creates your account if you do not have one. Your board then follows you to every device.'),
+    h('button.wskip', { onclick: () => dismiss(true) }, 'Look around without an account'));
+
+  const w = h('div', { id: 'welcome' }, h('div.woverlay'), card);
+  // Keep the app behind the gate out of the tab order while it is up.
+  if (app) { app.inert = true; app.setAttribute('aria-hidden', 'true'); }
+  w.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); dismiss(true); return; }
+    if (e.key !== 'Tab') return;
+    const stops = [gbtn, $('.wskip', w)].filter(el => el && !el.disabled);
+    if (!stops.length) return;
+    const first = stops[0], last = stops[stops.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  document.body.append(w);
+  setTimeout(() => gbtn.focus(), 60);
+}
+
 /* ---------- settings modal ---------- */
 function openSettings() {
   const root = $('#modalRoot');
@@ -1129,27 +1333,84 @@ function openSettings() {
   const body = h('div.sbody');
 
   body.append(h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '2px' } }, 'AI & sync'),
-    h('div', { style: { color: 'var(--ink2)', marginBottom: '18px', fontSize: '13px' } }, 'Keys stay in this browser only; they are never synced. Set them once per device.'));
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '18px', fontSize: '13px' } }, 'Your AI key is saved to your account, so it follows you to every device. The sync connection details stay in this browser.'));
 
   // --- Google AI ---
-  const keyIn = h('input.input.grow', { type: 'password', placeholder: 'Paste your AI Studio API key', value: CFG.gemKey, autocomplete: 'off' });
-  keyIn.addEventListener('input', () => { CFG.gemKey = keyIn.value.trim(); saveCfg(); });
-  const modelSel = h('select.input', {},
-    [['gemini-flash-latest', 'Gemini Flash, latest (default)'], ['gemini-flash-lite-latest', 'Gemini Flash-Lite, latest (higher free limits)'], ['gemini-pro-latest', 'Gemini Pro, latest (small free quota)']]
-      .map(([v, l]) => h('option', { value: v, selected: (CFG.gemModel || 'gemini-flash-latest') === v }, l)));
-  modelSel.addEventListener('change', () => { CFG.gemModel = modelSel.value; saveCfg(); });
+  const ai = aiCfg();
+  const ALIASES = [
+    ['gemini-flash-latest', 'Gemini Flash, latest (default)'],
+    ['gemini-flash-lite-latest', 'Gemini Flash-Lite, latest (higher free limits)'],
+    ['gemini-pro-latest', 'Gemini Pro, latest (small free quota)'],
+  ];
+  const keyIn = h('input.input.grow', { type: 'password', placeholder: 'Paste your AI Studio API key', value: ai.key, autocomplete: 'off' });
+  keyIn.addEventListener('input', () => {
+    aiCfg().key = keyIn.value.trim();
+    clearNotice('gem-key'); clearNotice('gem-quota'); // a new key invalidates the old complaint
+    save();
+  });
+  const modelSel = h('select.input.grow');
+  const nowLine = h('div.setnote');
+  function paintNow() {
+    const a = aiCfg();
+    nowLine.textContent = a.lastVersion
+      ? 'Answers are coming from ' + a.lastVersion + (/latest/.test(a.model || '') ? ', which is what "' + a.model + '" points to today.' : '.')
+      : 'Press Test to see exactly which model version answers.';
+  }
+  function fillModels(extra) {
+    const a = aiCfg();
+    const seen = [];
+    modelSel.innerHTML = '';
+    for (const [v, l] of ALIASES) { seen.push(v); modelSel.append(h('option', { value: v, selected: a.model === v }, l)); }
+    for (const m of (extra || [])) {
+      if (seen.indexOf(m) >= 0) continue;
+      seen.push(m);
+      modelSel.append(h('option', { value: m, selected: a.model === m }, m));
+    }
+    // A model saved on another device may not be in the list yet: keep it selectable.
+    if (a.model && seen.indexOf(a.model) < 0) modelSel.append(h('option', { value: a.model, selected: true }, a.model));
+    paintNow();
+  }
+  fillModels(cachedModels);
+  modelSel.addEventListener('change', () => {
+    aiCfg().model = modelSel.value;
+    aiCfg().lastVersion = '';
+    clearNotice('gem-model'); // the complaint was about the model they just replaced
+    save(); paintNow();
+  });
+
   const aiStatus = h('span', { style: { fontSize: '12.5px', fontWeight: '700' } });
   const testBtn = h('button.btn.small', { onclick: async () => {
     testBtn.disabled = true; aiStatus.textContent = 'Testing…'; aiStatus.className = '';
-    try { await gemini('Reply with exactly one word: ready'); aiStatus.textContent = '✓ AI is working'; aiStatus.className = 'okline'; }
-    catch (err) { aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', ''); aiStatus.className = 'errline'; }
+    try {
+      await gemini('Reply with exactly one word: ready');
+      aiStatus.textContent = '✓ Working';
+      aiStatus.className = 'okline';
+    } catch (err) {
+      aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', '').replace(', so this is the locally computed fallback', '');
+      aiStatus.className = 'errline';
+    }
+    paintNow();
     testBtn.disabled = false;
   } }, 'Test');
+  const refreshBtn = h('button.btn.small', { onclick: async () => {
+    refreshBtn.disabled = true; aiStatus.textContent = 'Loading models…'; aiStatus.className = '';
+    try {
+      cachedModels = await listGeminiModels();
+      fillModels(cachedModels);
+      aiStatus.textContent = '✓ ' + cachedModels.length + ' models available to this key';
+      aiStatus.className = 'okline';
+    } catch (err) {
+      aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', '');
+      aiStatus.className = 'errline';
+    }
+    refreshBtn.disabled = false;
+  } }, 'Refresh list');
   body.append(h('div.setsec', {},
-    h('span.label', {}, 'Google AI Studio'),
+    h('span.label', {}, 'Google AI'),
     h('div.frow', {}, keyIn),
-    h('div.frow', {}, modelSel, testBtn, aiStatus),
-    h('div.setnote', {}, 'Free key from aistudio.google.com (API keys page). Powers “Draft steps” and the two Summarize buttons. If the free quota runs out you’ll get a notice at the top of the app.')));
+    h('div.frow', {}, modelSel, refreshBtn, testBtn, aiStatus),
+    nowLine,
+    h('div.setnote', {}, 'Free key from aistudio.google.com, API keys page. Powers “Draft steps” and both Summarize buttons. Your key is saved to your account, so you enter it once and every device you sign in on picks it up.')));
 
   // --- Supabase ---
   const sec = h('div.setsec', {}, h('span.label', {}, 'Account & sync'));
@@ -1428,7 +1689,9 @@ function toggleDone(id) {
 }
 
 /* ---------- draw-cluster mode ---------- */
+let cancelDraw = null; // tears down an in-progress cluster drag, if there is one
 function setDrawMode(on) {
+  if (!on && cancelDraw) cancelDraw();
   drawMode = on;
   $('#btnZone').classList.toggle('on', on);
   $('#field').classList.toggle('drawing', on);
@@ -1442,6 +1705,44 @@ function wireCanvas() {
     if (e.target !== field) return;
     const r = field.getBoundingClientRect();
     newNoteAt(e.clientX - r.left - NOTE_W / 2, e.clientY - r.top - 20);
+  });
+
+  // Drag empty canvas to pan. Notes, zone headers and the draw tool claim the pointer first.
+  field.addEventListener('pointerdown', e => {
+    if (drawMode || e.button !== 0) return;
+    if (e.target.closest('.note, .zhead, .zresize, .zonepop')) return;
+    const sx = e.clientX, sy = e.clientY;
+    const sl = board.scrollLeft, st = board.scrollTop;
+    let panning = false;
+    // Capture up front, so releasing over the toolbar or outside the window still ends the pan.
+    try { field.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!panning) {
+        if (Math.abs(dx) + Math.abs(dy) < 4) return;
+        panning = true;
+        field.classList.add('panning');
+      }
+      board.scrollLeft = sl - dx;
+      board.scrollTop = st - dy;
+    };
+    const up = ev => {
+      if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+      field.removeEventListener('pointermove', mv);
+      field.removeEventListener('pointerup', up);
+      field.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      field.classList.remove('panning');
+      try { field.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    };
+    field.addEventListener('pointermove', mv);
+    field.addEventListener('pointerup', up);
+    field.addEventListener('pointercancel', up);
+    // Backstop: if capture ever fails to take, the release still reaches us here.
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
   });
 
   field.addEventListener('pointerdown', e => {
@@ -1458,12 +1759,17 @@ function wireCanvas() {
       x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hgt = Math.abs(by - ay);
       Object.assign(prev.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hgt + 'px' });
     };
-    const up = () => {
+    const finish = commit => {
+      if (!cancelDraw) return;     // already torn down
+      cancelDraw = null;           // cleared first, so setDrawMode below cannot recurse
       field.removeEventListener('pointermove', mv); field.removeEventListener('pointerup', up); field.removeEventListener('pointercancel', up);
+      try { field.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
       prev.style.display = 'none';
       setDrawMode(false);
-      if (w > 70 && hgt > 60) zoneNamePopover(x, y, Math.max(w, 130), Math.max(hgt, 100));
+      if (commit && w > 70 && hgt > 60) zoneNamePopover(x, y, Math.max(w, 130), Math.max(hgt, 100));
     };
+    const up = () => finish(true);
+    cancelDraw = () => finish(false);
     field.addEventListener('pointermove', mv);
     field.addEventListener('pointerup', up);
     field.addEventListener('pointercancel', up);
@@ -2218,6 +2524,7 @@ function boot() {
     window.addEventListener('hashchange', route);
     route();
     initSync();
+    maybeShowWelcome();
   });
   if (!storageOK) {
     const sn = $('#storageNote');
