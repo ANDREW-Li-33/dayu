@@ -948,42 +948,79 @@ async function signInWithGoogle() {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
   const challenge = b64url(new Uint8Array(digest));
   const redirect = location.origin + location.pathname;
+  // Remember that we left, so a silent bounce-back can be explained on return.
+  storeSet('dayu-oauth-pending', JSON.stringify({ at: Date.now(), redirect }));
   location.href = CFG.sbUrl + '/auth/v1/authorize?provider=google&redirect_to=' + encodeURIComponent(redirect)
     + '&code_challenge=' + challenge + '&code_challenge_method=s256';
 }
 // On load: finish an OAuth redirect if one is in the URL (PKCE ?code=, or implicit #access_token=)
+function clearPending() { storeSet('dayu-oauth-pending', ''); }
+function cleanUrl(keepHash) {
+  try { history.replaceState(null, '', location.pathname + (keepHash ? location.hash : '')); } catch (e) { /* sandboxed */ }
+}
 async function handleAuthRedirect() {
+  let pending = null;
+  try { pending = JSON.parse(storeGet('dayu-oauth-pending') || 'null'); } catch (e) { pending = null; }
   try {
     const qs = new URLSearchParams(location.search);
+
+    // 1. PKCE: Supabase sent us back with an auth code.
     if (qs.get('code') && sbConfigured()) {
+      const verifier = storeGet('dayu-pkce') || '';
+      cleanUrl(true);
+      clearPending();
+      if (!verifier) {
+        showNotice('sb-oauth', 'Sign-in could not finish: this browser lost the security code, which happens if sign-in started in a different browser or a private window. Try Continue with Google once more.');
+        return;
+      }
       const r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=pkce', {
         method: 'POST',
         headers: { apikey: CFG.sbAnon, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_code: qs.get('code'), code_verifier: storeGet('dayu-pkce') || '' }),
+        body: JSON.stringify({ auth_code: qs.get('code'), code_verifier: verifier }),
       });
       const j = await r.json().catch(() => ({}));
-      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ok */ }
-      if (r.ok && j.access_token) { applySession(j.access_token, j.refresh_token); toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : '')); }
-      else showNotice('sb-oauth', 'Google sign-in failed: ' + (j.error_description || j.msg || ('HTTP ' + r.status)));
+      if (r.ok && j.access_token) {
+        applySession(j.access_token, j.refresh_token);
+        toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : ''));
+      } else {
+        showNotice('sb-oauth', 'Google sign-in failed at the last step: ' + (j.error_description || j.msg || j.error || ('HTTP ' + r.status)));
+      }
       return;
     }
-    if (qs.get('error') || qs.get('error_description')) {
-      showNotice('sb-oauth', 'Google sign-in failed: ' + (qs.get('error_description') || qs.get('error')));
-      try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* ok */ }
-      return;
-    }
+
+    // 2. Implicit flow tokens, or an error, in the hash.
     if (location.hash.indexOf('access_token=') >= 0 || location.hash.indexOf('error=') >= 0) {
       const hs = new URLSearchParams(location.hash.replace(/^#\/?/, ''));
       if (hs.get('access_token')) {
         applySession(hs.get('access_token'), hs.get('refresh_token') || '');
+        clearPending(); cleanUrl(false);
         toast('Signed in' + (CFG.sbEmail ? ' as ' + CFG.sbEmail : ''));
-        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ok */ }
-      } else if (hs.get('error') || hs.get('error_description')) {
+        return;
+      }
+      if (hs.get('error') || hs.get('error_description')) {
         showNotice('sb-oauth', 'Google sign-in failed: ' + (hs.get('error_description') || hs.get('error')));
-        try { history.replaceState(null, '', location.pathname); } catch (e) { /* ok */ }
+        clearPending(); cleanUrl(false);
+        return;
       }
     }
-  } catch (e) { /* never block boot on auth parsing */ }
+
+    // 3. An error came back on the query string.
+    if (qs.get('error') || qs.get('error_description')) {
+      showNotice('sb-oauth', 'Google sign-in failed: ' + (qs.get('error_description') || qs.get('error')));
+      clearPending(); cleanUrl(true);
+      return;
+    }
+
+    // 4. We left for Google recently and came back with nothing at all. That means the
+    //    provider redirected somewhere else: this page's address is not on the allow list.
+    if (pending && pending.at && Date.now() - pending.at < 20 * 60 * 1000 && !CFG.sbRefresh) {
+      clearPending();
+      showNotice('sb-redirect', 'Sign-in bounced back without completing. In Supabase go to Authentication, URL Configuration, and add this exact address to Redirect URLs: ' + (pending.redirect || location.href));
+    }
+  } catch (e) {
+    clearPending();
+    showNotice('sb-oauth', 'Sign-in hit an unexpected error: ' + (e && e.message ? e.message : String(e)));
+  }
 }
 async function sbRefreshToken() {
   try {
