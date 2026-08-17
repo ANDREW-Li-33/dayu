@@ -477,7 +477,10 @@ a.wthumbwrap:hover{border-color:var(--accent)}
 .fhb{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
 .fhb .fhname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .fhb .strip7{display:flex;gap:2px;flex:0 0 auto}
-.fhb .fhstreak{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:0 0 auto;white-space:nowrap}
+/* fixed so the seven squares line up under their weekday letters on every row */
+.fhb .fhstreak{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:0 0 auto;white-space:nowrap;min-width:72px;text-align:right}
+.fhb.fhbhead{padding:0 0 1px}
+.fhb .sqlab{width:12px;font-size:8.5px;font-weight:800;line-height:1;text-align:center;color:var(--ink3)}
 .fstale{font-size:11px;color:var(--ink3)}
 .freq{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px;flex-wrap:wrap}
 .freq .ftext{flex:1;font-size:13px;min-width:150px}
@@ -594,6 +597,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .htable td.hname input{width:100%;border:none;outline:none;background:transparent;font:inherit}
 .haddrow input{width:100%;border:none;outline:none;background:transparent;padding:10px 12px;font-size:13px}
 .todaychip{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+.hscrollnote{font-size:11.5px;color:var(--ink3);margin:-14px 0 22px}
 
 /* ---------- archive view switch & goal history ---------- */
 .segbar{display:inline-flex;gap:2px;padding:3px;border-radius:11px;background:var(--raise);border:1px solid var(--line);margin-bottom:18px}
@@ -1725,11 +1729,11 @@ async function pushProfile() {
 }
 // What a friend is allowed to see. Built fresh from the board, pushed only when it changed.
 function progressSnapshot() {
-  const last7 = lastNDaysKeys(7);
+  const wk = weekKeys();                       // this calendar week, Monday through Sunday
   return {
     habits: activeHabits().slice(0, 12).map(hb => {
       const s = habitStats(hb);
-      return { name: hb.name, week: last7.map(k => hb.days[k] || ''), weekStart: last7[0], cur: s.cur, pct: s.pct };
+      return { name: hb.name, week: wk.map(k => hb.days[k] || ''), weekStart: wk[0], cur: s.cur, pct: s.pct };
     }),
     goals: STATE.goals.slice(0, 8).map(g => ({ name: g.name, done: goalCount(g), target: g.target, period: g.period })),
   };
@@ -3066,6 +3070,25 @@ function lastNDaysKeys(n) {
   for (let i = n - 1; i >= 0; i--) out.push(dayKey(t0 - i * DAY));
   return out;
 }
+// Days counted off the calendar rather than by subtracting 24 hours, so the clocks changing
+// cannot skip or repeat a day.
+function dayKeyOffset(days) {
+  const d = new Date();
+  return dayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days).getTime());
+}
+// Today first, then backwards. The sheet reads left to right from today into the past.
+function recentDaysKeys(n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(dayKeyOffset(-i));
+  return out;
+}
+// This calendar week, Monday through Sunday.
+function weekKeys() {
+  const mon = new Date(startOfWeek(Date.now()));
+  const out = [];
+  for (let i = 0; i < 7; i++) out.push(dayKey(new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + i).getTime()));
+  return out;
+}
 
 /* ---------- clean-sweep celebration ---------- */
 let lastSweepDay = null;
@@ -3088,7 +3111,9 @@ function toggleHabit(hb, dk) {
 }
 
 /* ---------- the sheet (goals page) ---------- */
-const SHEET_DAYS = 14;
+// Three months of history, newest first: today is the column you land on, and the rest
+// scrolls away to the right.
+const SHEET_DAYS = 90;
 function renderHabitSheet() {
   const box = h('div');
   const habs = activeHabits();
@@ -3097,7 +3122,7 @@ function renderHabitSheet() {
     h('span.label', {}, 'Daily goals'),
     habs.length ? h('span.todaychip', {}, 'Today: ' + done + ' of ' + habs.length) : null));
 
-  const keys = lastNDaysKeys(SHEET_DAYS);
+  const keys = recentDaysKeys(SHEET_DAYS);
   const tk = todayKey();
   const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -3158,7 +3183,11 @@ function renderHabitSheet() {
   tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
   box.append(h('div.hwrap', {}, h('table.htable', {}, thead, tbody)));
-  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
+  if (habs.length) {
+    box.append(h('div.hscrollnote', {}, 'Today is on the left. Scroll sideways to look back through the days.'));
+  } else {
+    box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
+  }
   return box;
 }
 
@@ -3710,6 +3739,11 @@ function friendCard(fid) {
   if (habs.length) {
     const sec = h('div');
     sec.append(h('div.label', { style: { marginBottom: '4px' } }, 'Daily goals'));
+    // The week runs Monday to Sunday, so it says so rather than leaving seven bare squares.
+    sec.append(h('div.fhb.fhbhead', {},
+      h('span.fhname'),
+      h('span.strip7', {}, ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(l => h('span.sqlab', {}, l))),
+      h('span.fhstreak')));
     for (const hb of habs) {
       const start = hb.weekStart ? keyToTs(hb.weekStart) : 0;
       sec.append(h('div.fhb', {},
