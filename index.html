@@ -63,6 +63,10 @@ input,select,textarea{font:inherit;color:var(--ink)}
 }
 .tab:hover{color:var(--ink);background:var(--accent-soft)}
 .tab.active{color:var(--accent);background:var(--accent-soft)}
+/* unread friend messages wait behind the Goals tab */
+.tabbadge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
+  padding:0 4px;margin-left:6px;border-radius:999px;background:var(--danger);color:var(--paper);
+  font-size:10px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;vertical-align:1px}
 #meters{margin-left:auto;display:flex;align-items:center;gap:14px}
 .meter{display:flex;flex-direction:column;gap:3px;min-width:96px;cursor:pointer;border-radius:6px;padding:2px 4px}
 .meter:hover{background:var(--accent-soft)}
@@ -344,6 +348,45 @@ a.wthumbwrap:hover{border-color:var(--accent)}
 .lnkbtn:hover{background:var(--accent-soft);color:var(--ink)}
 .wprev{margin-top:12px}
 .wprev img{max-width:150px;max-height:150px;border-radius:10px;border:1px solid var(--line);background:var(--raise);display:block}
+
+/* ---------- friends ---------- */
+.fhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.fhead .label{flex:1}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.fcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.fid{display:flex;align-items:center;gap:10px}
+.fid .fwho{flex:1;min-width:0}
+.favatar{position:relative;flex:0 0 auto;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;color:var(--note-ink);overflow:hidden;user-select:none}
+.favatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fname{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fmail{font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgbtn{position:relative}
+.msgbadge{position:absolute;top:-7px;right:-7px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;
+  background:var(--danger);color:var(--paper);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.fhb{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:3px 0}
+.fhb .fhname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.fhb .strip7{display:flex;gap:2px;flex:0 0 auto}
+.fhb .fhstreak{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;flex:0 0 auto;white-space:nowrap}
+.fstale{font-size:11px;color:var(--ink3)}
+.freq{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px;margin-bottom:10px;flex-wrap:wrap}
+.freq .ftext{flex:1;font-size:13px;min-width:150px}
+.fwait{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);padding:8px 2px}
+/* everyone who has signed in, listed in the add-a-friend picker */
+.plist{display:flex;flex-direction:column}
+.prow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:none}
+.pwho{flex:1;min-width:0}
+/* chat */
+.chatlog{height:min(320px,45vh);overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:12px;
+  background:var(--raise);border:1px solid var(--line);border-radius:12px}
+.cmsg{max-width:82%;padding:7px 11px;border-radius:13px;font-size:13.5px;line-height:1.4;overflow-wrap:break-word;white-space:pre-wrap}
+.cmsg.me{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.cmsg.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.cday{align-self:center;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:6px 0 2px}
+.crow{display:flex;gap:8px;margin-top:12px}
+.crow .input{flex:1}
+.cempty{align-self:center;color:var(--ink3);font-size:12.5px;padding:20px 10px;text-align:center}
 
 /* ---------- toast / misc ---------- */
 #toastRoot{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
@@ -1057,10 +1100,12 @@ function applySession(access, refresh) {
     STATE.meta.updatedAt = 1;
     storeSet(STORE_KEY, JSON.stringify(STATE));
     renderAll();
+    resetFriendsCache(); // the friends list on screen belongs to whoever was here before
   }
   if (uidNew) CFG.lastUserId = uidNew;
   saveCfg();
   clearNotice('sb-signin');
+  pushProfile(); // so this person shows up in everyone's add-a-friend list
 }
 /* ---- Google sign-in (PKCE, no library) ----
    Returns {ok:true} when the browser is being handed to Google, or {ok:false, message}
@@ -1181,7 +1226,16 @@ async function handleAuthRedirect() {
     showNotice('sb-oauth', 'Sign-in hit an unexpected error: ' + (e && e.message ? e.message : String(e)));
   }
 }
-async function sbRefreshToken() {
+// Single-flight: a refresh token is one-time-use, and at boot the board sync, the profile
+// push and the friends load all wake up wanting a session at once. They must share one
+// exchange, or the losers would burn a spent token and read that as "signed out".
+let refreshingToken = null;
+function sbRefreshToken() {
+  if (refreshingToken) return refreshingToken;
+  refreshingToken = sbRefreshTokenNow().finally(() => { refreshingToken = null; });
+  return refreshingToken;
+}
+async function sbRefreshTokenNow() {
   let r;
   try {
     r = await fetch(CFG.sbUrl + '/auth/v1/token?grant_type=refresh_token', {
@@ -1211,6 +1265,8 @@ function sbSignOut() {
   SB.access = null; CFG.sbRefresh = ''; CFG.sbEmail = '';
   storeSet(WELCOME_KEY, '1'); // someone who found the sign-out button does not need the intro again
   saveCfg(); syncStatus('signin');
+  resetFriendsCache();
+  repaintFriends();
 }
 function schedulePush() {
   if (!sbConfigured() || (!SB.access && !CFG.sbRefresh)) return;
@@ -1256,6 +1312,7 @@ async function syncNow() {
     } else {
       syncStatus('ok');
     }
+    await pushProgress(); // friends see the trimmed snapshot, never the board itself
   } catch (e) {
     syncStatus('off');
     if (!storageOK) showNotice('sandbox', 'This preview page can’t reach the internet, so AI and sync are off here. They work when Tack runs locally or on your own hosting.');
@@ -1269,6 +1326,279 @@ function initSync() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && sbConfigured() && Date.now() - SB.lastPull > 30000) syncNow();
   });
+}
+
+/* ---------- friends: directory, requests, shared progress, messages ---------- */
+// Four small tables (SETUP.md has the SQL). Everyone signed in can see the user list;
+// a progress row is readable only by accepted friends; a message only by its two people.
+// What friends see is a trimmed snapshot (goal names, marks, streaks), never the board.
+const FR = {
+  profiles: [], links: [], progress: {}, msgs: [],
+  ready: false, missing: false, error: '',
+  lastMsgId: 0, lastProgressPushed: '', profilePushed: false,
+  chatWith: null, chatHook: null, ticks: 0,
+};
+function myId() {
+  if (CFG.lastUserId) return CFG.lastUserId;
+  const p = SB.access ? jwtPayload(SB.access) : null;
+  return (p && p.sub) || '';
+}
+function resetFriendsCache() {
+  FR.profiles = []; FR.links = []; FR.progress = {}; FR.msgs = [];
+  FR.ready = false; FR.error = ''; FR.lastMsgId = 0;
+  FR.lastProgressPushed = ''; FR.profilePushed = false;
+  updateFriendBadge();
+}
+function profileOf(userId) { return FR.profiles.find(p => p.user_id === userId) || null; }
+function displayName(userId) {
+  const p = profileOf(userId);
+  return (p && (p.name || p.email)) || 'Someone';
+}
+function linkWith(userId) {
+  const me = myId();
+  return FR.links.find(l => (l.requester === me && l.addressee === userId) || (l.requester === userId && l.addressee === me)) || null;
+}
+function friendIds() {
+  const me = myId();
+  return FR.links.filter(l => l.status === 'accepted' && (l.requester === me || l.addressee === me))
+    .map(l => (l.requester === me ? l.addressee : l.requester));
+}
+function incomingRequests() { return FR.links.filter(l => l.status === 'pending' && l.addressee === myId()); }
+function outgoingRequests() { return FR.links.filter(l => l.status === 'pending' && l.requester === myId()); }
+function unreadFrom(userId) { return FR.msgs.filter(m => m.recipient === myId() && m.sender === userId && !m.read_at).length; }
+// Only current friends count: an unfriended person's leftovers must not light the badge
+// forever, since there is no longer a chat to open and clear them with.
+function unreadTotal() {
+  const ids = new Set(friendIds());
+  return FR.msgs.filter(m => m.recipient === myId() && !m.read_at && ids.has(m.sender)).length;
+}
+// A signed-in caller may hold only a refresh token (first call after load); trade it in.
+async function frReady() {
+  if (!sbConfigured() || !signedIn()) return false;
+  if (!SB.access && CFG.sbRefresh) { if (!await sbRefreshToken()) return false; }
+  return !!SB.access;
+}
+// PostgREST answers 404 with code PGRST205 when the table itself is absent: the SQL has
+// not been run yet. Any other 404 is a passing hiccup, never a reason to declare the
+// whole feature missing. Either way the caller should stop what it was doing.
+async function frMissing(r) {
+  if (!r || r.status !== 404) return false;
+  let sig = '';
+  try { const j = await r.json(); sig = String((j && (j.code || '')) + ' ' + (j && j.message || '')); } catch (e) { /* not JSON */ }
+  if (/PGRST20|schema cache|does not exist/i.test(sig)) FR.missing = true;
+  else FR.error = 'HTTP 404';
+  return true;
+}
+let loadingFriends = null;
+// Plain calls share one round trip. After a write, pass fresh=true: a load already in
+// flight was asked before the write happened, so its answer would repaint the old world.
+function loadFriends(fresh) {
+  if (loadingFriends) {
+    if (!fresh) return loadingFriends;
+    return loadingFriends.then(() => loadFriends(true));
+  }
+  loadingFriends = (async () => {
+    try {
+      if (!await frReady() || FR.missing) return false;
+      const [pr, fr, gr, mr] = await Promise.all([
+        sbFetch('/rest/v1/dayu_profiles?select=user_id,name,email,avatar&order=name'),
+        sbFetch('/rest/v1/dayu_friends?select=requester,addressee,status,created_at'),
+        sbFetch('/rest/v1/dayu_progress?select=user_id,data,updated_at'),
+        sbFetch('/rest/v1/dayu_messages?select=id,sender,recipient,body,created_at,read_at&order=id.desc&limit=400'),
+      ]);
+      if (await frMissing(pr) || await frMissing(fr) || await frMissing(gr) || await frMissing(mr)) return false;
+      const bad = [pr, fr, gr, mr].find(r => !r.ok);
+      if (bad) { FR.error = 'HTTP ' + bad.status; return false; }
+      FR.profiles = await pr.json();
+      FR.links = await fr.json();
+      const rows = await gr.json();
+      FR.progress = {};
+      for (const row of rows) FR.progress[row.user_id] = row;
+      const fetched = (await mr.json()).reverse();
+      // A message sent seconds ago can be newer than this snapshot was on the server;
+      // keep such strays rather than letting a slower full load erase them from a chat.
+      const maxId = fetched.length ? fetched[fetched.length - 1].id : 0;
+      FR.msgs = fetched.concat(FR.msgs.filter(m => m.id > maxId));
+      FR.lastMsgId = FR.msgs.length ? FR.msgs[FR.msgs.length - 1].id : 0;
+      FR.ready = true; FR.error = '';
+      // Receipts the snapshot may predate: whoever is on screen has been read.
+      if (FR.chatWith) markConversationRead(FR.chatWith);
+      updateFriendBadge();
+      return true;
+    } catch (e) {
+      FR.error = 'offline'; return false;
+    } finally {
+      loadingFriends = null;
+    }
+  })();
+  return loadingFriends;
+}
+// The profile row is what makes a person findable. Name and picture come from Google.
+async function pushProfile() {
+  if (FR.profilePushed || FR.missing) return;
+  try {
+    if (!await frReady()) return;
+    const r = await sbFetch('/auth/v1/user');
+    if (!r.ok) return;
+    const u = await r.json();
+    if (!u || !u.id) return;
+    const md = u.user_metadata || {};
+    const pr = await sbFetch('/rest/v1/dayu_profiles', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{
+        user_id: u.id,
+        name: String(md.full_name || md.name || '').slice(0, 80),
+        email: u.email || '',
+        avatar: safeUrl(md.avatar_url || md.picture || ''),
+        updated_at: new Date().toISOString(),
+      }]),
+    });
+    if (await frMissing(pr)) return;
+    if (pr.ok) FR.profilePushed = true;
+  } catch (e) { /* the next session tries again */ }
+}
+// What a friend is allowed to see. Built fresh from the board, pushed only when it changed.
+function progressSnapshot() {
+  const last7 = lastNDaysKeys(7);
+  return {
+    habits: activeHabits().slice(0, 12).map(hb => {
+      const s = habitStats(hb);
+      return { name: hb.name, week: last7.map(k => hb.days[k] || ''), weekStart: last7[0], cur: s.cur, pct: s.pct };
+    }),
+    goals: STATE.goals.slice(0, 8).map(g => ({ name: g.name, done: goalCount(g), target: g.target, period: g.period })),
+  };
+}
+async function pushProgress() {
+  if (FR.missing || !SB.access) return;
+  const snap = progressSnapshot();
+  const flat = JSON.stringify(snap);
+  if (flat === FR.lastProgressPushed) return;
+  try {
+    const r = await sbFetch('/rest/v1/dayu_progress', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify([{ user_id: myId(), data: snap, updated_at: new Date().toISOString() }]),
+    });
+    if (await frMissing(r)) return;
+    if (r.ok) FR.lastProgressPushed = flat;
+  } catch (e) { /* the next sync tries again */ }
+}
+async function requestFriend(userId) {
+  const l = linkWith(userId);
+  if (l && l.status === 'pending' && l.requester === userId) return acceptFriend(userId); // they asked first, so this IS the yes
+  if (l) return { ok: true };
+  if (!await frReady()) return { ok: false, message: 'Sign in first.' };
+  const r = await sbFetch('/rest/v1/dayu_friends', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify([{ requester: myId(), addressee: userId, status: 'pending' }]),
+  }).catch(() => null);
+  if (!r) return { ok: false, message: 'No connection right now.' };
+  if (r.status === 409) { await loadFriends(true); return { ok: true }; } // they invited us in the same breath
+  if (await frMissing(r) || !r.ok) return { ok: false, message: 'Could not send the invite (HTTP ' + r.status + ').' };
+  await loadFriends(true);
+  return { ok: true };
+}
+async function acceptFriend(userId) {
+  if (!await frReady()) return { ok: false, message: 'Sign in first.' };
+  const r = await sbFetch('/rest/v1/dayu_friends?requester=eq.' + encodeURIComponent(userId) + '&addressee=eq.' + encodeURIComponent(myId()), {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ status: 'accepted' }),
+  }).catch(() => null);
+  if (!r || !r.ok) return { ok: false, message: 'Could not accept right now.' };
+  await loadFriends(true);
+  return { ok: true };
+}
+// Decline, cancel, or unfriend: all the same row, whichever way round it was made.
+async function removeFriendship(userId) {
+  if (!await frReady()) return { ok: false };
+  markConversationRead(userId); // settle the receipts while the messages are still reachable
+  const me = encodeURIComponent(myId()), them = encodeURIComponent(userId);
+  const r = await sbFetch('/rest/v1/dayu_friends?or=(and(requester.eq.' + me + ',addressee.eq.' + them + '),and(requester.eq.' + them + ',addressee.eq.' + me + '))', {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  }).catch(() => null);
+  if (!r || !r.ok) return { ok: false };
+  await loadFriends(true);
+  return { ok: true };
+}
+async function sendFriendMessage(userId, text) {
+  const body = String(text || '').trim().slice(0, 2000);
+  if (!body) return { ok: false, message: 'Write something first.' };
+  if (!await frReady()) return { ok: false, message: 'Sign in first.' };
+  const r = await sbFetch('/rest/v1/dayu_messages', {
+    method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify([{ recipient: userId, body }]),
+  }).catch(() => null);
+  if (!r) return { ok: false, message: 'No connection right now.' };
+  if (r.status === 403 || r.status === 401) return { ok: false, message: 'You two are not connected as friends any more.' };
+  if (!r.ok) return { ok: false, message: 'Could not send (HTTP ' + r.status + ').' };
+  const rows = await r.json().catch(() => []);
+  const m = rows && rows[0];
+  // Show it, but do NOT advance the poll cursor: a friend's message with a lower id may
+  // still be on its way, and a raised cursor would skip past it forever.
+  if (m) FR.msgs.push(m);
+  return { ok: true };
+}
+function markConversationRead(userId) {
+  const unread = FR.msgs.filter(m => m.sender === userId && m.recipient === myId() && !m.read_at);
+  if (!unread.length) return;
+  const now = new Date().toISOString();
+  for (const m of unread) m.read_at = now; // paint first; the server catches up
+  updateFriendBadge();
+  frReady().then(ok => {
+    if (!ok) return;
+    sbFetch('/rest/v1/dayu_messages?sender=eq.' + encodeURIComponent(userId) + '&recipient=eq.' + encodeURIComponent(myId()) + '&read_at=is.null', {
+      method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ read_at: now }),
+    }).catch(() => {});
+  });
+}
+// A slow heartbeat keeps messages fresh; every third tick refetches everything, which
+// also heals read receipts from other devices and friendships accepted elsewhere.
+async function friendsPollTick() {
+  if (!signedIn() || document.hidden) return;
+  FR.ticks++;
+  if (FR.missing) {
+    // The owner may have run the SQL since; look again every few minutes instead of
+    // staying dark until the next full page load.
+    if (FR.ticks % 15 === 0) { FR.missing = false; if (await loadFriends()) repaintFriendsIfSafe(); }
+    return;
+  }
+  if (!FR.ready) { if (await loadFriends()) repaintFriendsIfSafe(); return; }
+  try {
+    const r = await sbFetch('/rest/v1/dayu_messages?select=id,sender,recipient,body,created_at,read_at&id=gt.' + FR.lastMsgId + '&order=id.asc');
+    if (r.ok) {
+      const rows = await r.json();
+      // Advance the cursor over everything the server returned, seen before or not.
+      if (rows.length) FR.lastMsgId = Math.max(FR.lastMsgId, rows[rows.length - 1].id);
+      const known = new Set(FR.msgs.map(m => m.id));
+      const fresh = rows.filter(m => !known.has(m.id));
+      if (fresh.length) {
+        FR.msgs.push(...fresh);
+        const incoming = fresh.filter(m => m.recipient === myId());
+        if (FR.chatWith && FR.chatHook && incoming.some(m => m.sender === FR.chatWith)) {
+          FR.chatHook();
+          markConversationRead(FR.chatWith);
+        }
+        const elsewhere = incoming.filter(m => m.sender !== FR.chatWith);
+        if (elsewhere.length) {
+          const m = elsewhere[elsewhere.length - 1];
+          toast(displayName(m.sender) + ': ' + (m.body.length > 60 ? m.body.slice(0, 58) + '…' : m.body), null, 4500);
+        }
+        updateFriendBadge();
+        repaintFriendsIfSafe();
+      }
+    } else await frMissing(r);
+  } catch (e) { /* offline; the next tick tries again */ }
+  if (FR.ticks % 3 === 0) {
+    if (!FR.profilePushed) pushProfile(); // a failed first push must not hide this person forever
+    if (await loadFriends()) repaintFriendsIfSafe();
+  }
+}
+function initFriends() {
+  if (signedIn()) { pushProfile(); loadFriends().then(ok => { if (ok) repaintFriendsIfSafe(); }); }
+  setInterval(friendsPollTick, 20000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') friendsPollTick(); });
 }
 
 /* ---------- welcome gate for first-time visitors ---------- */
@@ -1953,11 +2283,13 @@ function zoneNamePopover(x, y, w, hgt) {
 
 /* ---------- note modal ---------- */
 let modalNoteId = null;
+let modalOnClose = null; // a modal with tidying to do (the chat) registers here; every close path runs it
 function closeModal() {
   const root = $('#modalRoot');
   if (!root.classList.contains('open')) return;
   root.classList.remove('open'); root.innerHTML = '';
   modalNoteId = null;
+  if (modalOnClose) { const fn = modalOnClose; modalOnClose = null; fn(); }
   renderCanvas(); renderMeters();
   if (currentPage() === 'archive') renderArchive();
 }
@@ -2572,7 +2904,7 @@ function renderGoals() {
   const inner = $('#goalsInner');
   inner.innerHTML = '';
   inner.append(h('h1', {}, 'Goals'),
-    h('div.sub', {}, 'Daily goals up top, checked off sheet-style. Bigger targets and rewards below. The Dashboard keeps score.'));
+    h('div.sub', {}, 'Daily goals up top, checked off sheet-style. Bigger targets and rewards below, and friends at the bottom to keep you honest.'));
 
   inner.append(renderHabitSheet());
 
@@ -2582,7 +2914,7 @@ function renderGoals() {
 
   // --- goals ---
   goalsCol.append(h('div.label', { style: { marginBottom: '10px' } }, 'Task goals'));
-  if (!STATE.goals.length) goalsCol.append(h('div.empty', {}, 'No goals yet — set your first pace below.'));
+  if (!STATE.goals.length) goalsCol.append(h('div.empty', {}, 'No goals yet. Set your first pace below.'));
   for (const g of STATE.goals) {
     const nDone = goalCount(g), met = nDone >= g.target, pct = clamp(nDone / g.target * 100, 0, 100);
     const cat = catById(g.catId);
@@ -2637,6 +2969,306 @@ function renderGoals() {
     h('div.frow', {}, wText),
     h('div.frow', {}, wUrl),
     h('div.frow', {}, wGoal, h('button.btn.primary.small', { onclick: addWish }, 'Add'))));
+
+  inner.append(renderFriendsSection());
+}
+
+/* ---------- friends on the goals page ---------- */
+let friendsMount = null;
+function updateFriendBadge() {
+  const tab = $('.tab[data-page="goals"]');
+  if (!tab) return;
+  const n = unreadTotal();
+  let b = $('.tabbadge', tab);
+  if (!n) { if (b) b.remove(); return; }
+  if (!b) { b = h('span.tabbadge'); tab.append(b); }
+  b.textContent = n > 99 ? '99+' : String(n);
+}
+function repaintFriends() { if (friendsMount && friendsMount.isConnected) paintFriends(friendsMount); }
+// The poll calls this: never repaint while the person's cursor is inside the section.
+function repaintFriendsIfSafe() {
+  if (!friendsMount || !friendsMount.isConnected) return;
+  if (friendsMount.contains(document.activeElement)) return;
+  paintFriends(friendsMount);
+}
+function renderFriendsSection() {
+  const box = h('div.dsec');
+  friendsMount = box;
+  paintFriends(box);
+  if (signedIn() && !FR.missing) loadFriends().then(() => { if (box.isConnected) paintFriends(box); });
+  return box;
+}
+function agoText(iso) {
+  const t = Date.parse(iso || '');
+  if (!t) return 'a while ago';
+  const s = Math.max(0, Date.now() - t);
+  if (s < 90000) return 'just now';
+  if (s < 3600000) return Math.round(s / 60000) + ' min ago';
+  if (s < 86400000) return Math.round(s / 3600000) + ' h ago';
+  return fmtD(t);
+}
+// Only picture hosts Google itself serves avatars from. A profile row is writable by its
+// owner with any URL, and an arbitrary host would let one user turn everyone else's
+// friend list into a beacon that pings their server.
+function safeAvatarUrl(raw) {
+  const s = safeUrl(raw);
+  if (!s) return '';
+  try {
+    return /(^|\.)googleusercontent\.com$/i.test(new URL(s).hostname) ? s : '';
+  } catch (e) { return ''; }
+}
+// Initials on a sticky-note color, with the Google picture layered on top when it loads.
+function avatarEl(userId, size) {
+  const name = displayName(userId);
+  const initials = name.split(/\s+/).slice(0, 2).map(w => (w[0] || '')).join('').toUpperCase() || '?';
+  let hash = 0;
+  for (const ch of String(userId)) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const el = h('span.favatar', { 'aria-hidden': 'true', style: { background: PAL[hash % PAL.length].bg } }, initials);
+  if (size) { el.style.width = size + 'px'; el.style.height = size + 'px'; el.style.fontSize = Math.round(size * .38) + 'px'; }
+  const p = profileOf(userId);
+  const src = p ? safeAvatarUrl(p.avatar) : '';
+  if (src) {
+    const img = h('img', { src, alt: '', referrerPolicy: 'no-referrer' });
+    img.addEventListener('error', () => img.remove());
+    el.append(img);
+  }
+  return el;
+}
+function paintFriends(box) {
+  box.innerHTML = '';
+  const head = h('div.fhead', {}, h('span.label', {}, 'Friends'));
+  box.append(head);
+  if (!sbConfigured()) return;
+  if (!signedIn()) {
+    box.append(h('div.gcard', {},
+      h('div', { style: { marginBottom: '10px' } }, 'Add a friend, watch their streaks grow, and trade encouragement. Sign in and you both show up here.'),
+      h('button.btn.primary.small', { onclick: () => signInWithGoogle() }, 'Continue with Google')));
+    return;
+  }
+  if (FR.missing) {
+    box.append(h('div.empty', {}, 'Friends are not switched on for this copy of Dayu yet: its database is missing the friends tables. The owner runs the SQL in SETUP.md once, and this section comes alive.'));
+    return;
+  }
+  head.append(h('button.btn.small', { onclick: openFriendPicker }, '＋ Add a friend'));
+  if (!FR.ready) {
+    box.append(h('div.empty', {}, FR.error ? 'Could not reach the friends list (' + FR.error + '). It keeps retrying on its own.' : 'Looking up your friends…'));
+    return;
+  }
+  for (const l of incomingRequests()) {
+    const other = l.requester;
+    box.append(h('div.freq', {},
+      avatarEl(other),
+      h('span.ftext', {}, h('b', {}, displayName(other)), ' wants to be friends. You would see each other\'s goals and progress.'),
+      h('button.btn.primary.small', { onclick: async e => {
+        e.target.disabled = true;
+        const r = await acceptFriend(other);
+        if (!r.ok) { toast(r.message || 'Could not accept right now. It will still be here later.'); e.target.disabled = false; }
+        repaintFriends();
+      } }, 'Accept'),
+      h('button.btn.ghost.small', { onclick: async e => { e.target.disabled = true; await removeFriendship(other); repaintFriends(); } }, 'Decline')));
+  }
+  const ids = friendIds();
+  if (ids.length) {
+    const grid = h('div.fgrid');
+    for (const fid of ids) grid.append(friendCard(fid));
+    box.append(grid);
+  } else if (!incomingRequests().length && !outgoingRequests().length) {
+    box.append(h('div.empty', {}, 'Nobody here yet. Add a friend to see each other\'s daily goals, streaks and task goals, and to send a push when it counts.'));
+  }
+  for (const l of outgoingRequests()) {
+    const other = l.addressee;
+    box.append(h('div.fwait', {},
+      avatarEl(other, 24),
+      h('span', {}, 'Waiting for ', h('b', {}, displayName(other)), ' to accept'),
+      h('button.xbtn', { title: 'Cancel the invite', onclick: async e => { e.target.disabled = true; await removeFriendship(other); repaintFriends(); } }, '✕')));
+  }
+}
+function friendCard(fid) {
+  const prog = FR.progress[fid];
+  const data = (prog && prog.data) || null;
+  const unread = unreadFrom(fid);
+  const p = profileOf(fid);
+  const card = h('div.fcard', {},
+    h('div.fid', {}, avatarEl(fid),
+      h('span.fwho', {},
+        h('div.fname', {}, displayName(fid)),
+        p && p.name && p.email ? h('div.fmail', {}, p.email) : null),
+      h('button.btn.small.msgbtn', { onclick: () => openChat(fid) }, '💬 Message',
+        unread ? h('span.msgbadge', {}, unread > 9 ? '9+' : String(unread)) : null)));
+  const habs = (data && Array.isArray(data.habits)) ? data.habits : [];
+  const goals = (data && Array.isArray(data.goals)) ? data.goals : [];
+  if (habs.length) {
+    const sec = h('div');
+    sec.append(h('div.label', { style: { marginBottom: '4px' } }, 'Daily goals'));
+    for (const hb of habs) {
+      const start = hb.weekStart ? keyToTs(hb.weekStart) : 0;
+      sec.append(h('div.fhb', {},
+        h('span.fhname', { title: hb.name }, hb.name),
+        h('span.strip7', {}, (Array.isArray(hb.week) ? hb.week : []).slice(0, 7).map((raw, i) => {
+          // The snapshot is friend-authored data; only the known cell states may become
+          // class names, anything else renders as a blank day.
+          const v = CELL_ORDER.indexOf(raw) >= 0 ? raw : '';
+          return h('span.sq' + (v ? '.c-' + v : ''), { title: (start ? dayKey(start + i * DAY) : '') + (v ? ' (' + v + ')' : '') });
+        })),
+        h('span.fhstreak', {}, (Number(hb.cur) || 0) + ' day streak')));
+    }
+    card.append(sec);
+  }
+  if (goals.length) {
+    const sec = h('div');
+    sec.append(h('div.label', { style: { marginBottom: '4px' } }, 'Task goals'));
+    for (const g of goals) {
+      const target = Math.max(1, Number(g.target) || 1);
+      const done = Math.max(0, Number(g.done) || 0);
+      const pct = clamp(done / target * 100, 0, 100);
+      sec.append(h('div.minigoal', {},
+        h('span.mgname', {}, g.name),
+        h('div.gtrack', {}, h('div.gfill' + (done >= target ? '.full' : ''), { style: { width: pct + '%', height: '100%', borderRadius: '4px', background: done >= target ? 'var(--good)' : 'var(--accent)' } })),
+        h('span.gnum', {}, done + ' / ' + target)));
+    }
+    card.append(sec);
+  }
+  if (habs.length || goals.length) card.append(h('div.fstale', {}, 'Updated ' + agoText(prog.updated_at)));
+  else card.append(h('div.fstale', {}, 'No progress to show yet. It appears after their next visit.'));
+  onRightClickDelete(card, displayName(fid) + ' from your friends', async () => {
+    const r = await removeFriendship(fid);
+    toast(r.ok ? 'You and ' + displayName(fid) + ' are no longer connected' : 'Could not remove them right now');
+    repaintFriends();
+  });
+  return card;
+}
+// Small user base, so the picker is simply everyone who has ever signed in.
+function openFriendPicker() {
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const list = h('div.plist');
+  const note = h('div.setnote');
+  const paintList = () => {
+    list.innerHTML = '';
+    if (!FR.ready) {
+      if (FR.missing) { list.append(h('div.empty', {}, 'Friends are not switched on for this copy of Dayu yet. SETUP.md explains the one-time database step.')); return; }
+      if (FR.error) {
+        list.append(h('div.empty', {}, 'Could not load the list (' + FR.error + ').'),
+          h('div', { style: { textAlign: 'center', paddingBottom: '14px' } },
+            h('button.btn.small', { onclick: () => {
+              list.innerHTML = ''; list.append(h('div.empty', {}, 'Looking everyone up…'));
+              loadFriends().then(paintList);
+            } }, 'Try again')));
+        return;
+      }
+      list.append(h('div.empty', {}, 'Looking everyone up…'));
+      return;
+    }
+    const others = FR.profiles.filter(p => p.user_id !== myId());
+    if (!others.length) {
+      list.append(h('div.empty', {}, 'Nobody else has signed in to Dayu yet. Send someone the link, and once they sign in they appear here.'));
+      return;
+    }
+    for (const p of others) {
+      const l = linkWith(p.user_id);
+      let action;
+      if (l && l.status === 'accepted') {
+        // Also the only unfriend button that works on a touch screen, where the
+        // right-click on the friend card does not exist.
+        action = h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '8px' } },
+          h('span.okline', {}, '✓ Friends'),
+          h('button.btn.ghost.small', { onclick: e => askDelete(e, displayName(p.user_id) + ' from your friends', async () => {
+            const r = await removeFriendship(p.user_id);
+            toast(r.ok ? 'You and ' + displayName(p.user_id) + ' are no longer connected' : 'Could not remove them right now');
+            paintList(); repaintFriends();
+          }) }, 'Remove'));
+      } else if (l && l.requester === myId()) {
+        action = h('button.btn.ghost.small', { onclick: async e => { e.target.disabled = true; await removeFriendship(p.user_id); paintList(); repaintFriends(); } }, 'Cancel invite');
+      } else if (l) {
+        action = h('button.btn.primary.small', { onclick: async e => { e.target.disabled = true; await acceptFriend(p.user_id); paintList(); repaintFriends(); } }, 'Accept');
+      } else {
+        action = h('button.btn.primary.small', { onclick: async e => {
+          e.target.disabled = true;
+          const r = await requestFriend(p.user_id);
+          if (!r.ok) note.textContent = r.message || 'That did not go through. Try again in a moment.';
+          paintList(); repaintFriends();
+        } }, 'Add');
+      }
+      list.append(h('div.prow', {}, avatarEl(p.user_id),
+        h('span.pwho', {},
+          h('div.fname', {}, p.name || p.email || 'Someone'),
+          p.name && p.email ? h('div.fmail', {}, p.email) : null),
+        action));
+    }
+  };
+  paintList();
+  loadFriends().then(paintList);
+  const body = h('div.sbody', {},
+    h('h1', { style: { fontSize: '19px', fontWeight: '800', marginBottom: '2px' } }, 'Add a friend'),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '16px', fontSize: '13px' } }, 'Everyone who has signed in to Dayu. Once they say yes, you see each other\'s goals and progress, and can message each other.'),
+    list, note);
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {}, h('span'), h('button.btn.small', { onclick: closeModal }, 'Done')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+}
+function openChat(fid) {
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const log = h('div.chatlog');
+  const convo = () => FR.msgs.filter(m =>
+    (m.sender === fid && m.recipient === myId()) || (m.sender === myId() && m.recipient === fid));
+  // Follow the conversation only when the reader is already at the bottom; someone
+  // scrolled up rereading old messages must not be yanked down by a new arrival.
+  const paintLog = force => {
+    const stick = force || log.scrollTop + log.clientHeight >= log.scrollHeight - 40;
+    log.innerHTML = '';
+    const ms = convo();
+    if (!ms.length) {
+      log.append(h('div.cempty', {}, 'No messages yet. Say hi, or tell them their streak looks unstoppable.'));
+      return;
+    }
+    let lastDay = '';
+    for (const m of ms) {
+      const t = Date.parse(m.created_at || '') || Date.now();
+      const dk = dayKey(t);
+      if (dk !== lastDay) { lastDay = dk; log.append(h('div.cday', {}, fmtFull(t))); }
+      log.append(h('div.cmsg' + (m.sender === myId() ? '.me' : '.them'), { title: new Date(t).toLocaleString() }, m.body));
+    }
+    if (stick) log.scrollTop = log.scrollHeight;
+  };
+  paintLog(true);
+  markConversationRead(fid);
+  FR.chatWith = fid;
+  FR.chatHook = paintLog;
+  modalOnClose = () => { FR.chatWith = null; FR.chatHook = null; updateFriendBadge(); repaintFriends(); };
+  const inp = h('input.input', { placeholder: 'Cheer them on…', maxLength: 2000 });
+  const err = h('div.errline', { style: { marginTop: '6px' } });
+  const sendBtn = h('button.btn.primary.small', { onclick: doSend }, 'Send');
+  async function doSend() {
+    const text = inp.value.trim();
+    if (!text) { inp.focus(); return; }
+    sendBtn.disabled = true; err.textContent = '';
+    const r = await sendFriendMessage(fid, text);
+    sendBtn.disabled = false;
+    if (!r.ok) { err.textContent = r.message || 'Could not send.'; return; }
+    inp.value = '';
+    paintLog(true);
+    inp.focus();
+  }
+  // isComposing: the Enter that commits an IME conversion must not send half a word.
+  // sendBtn.disabled: a held or repeated Enter must not send the same text twice.
+  inp.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing || sendBtn.disabled) return;
+    doSend();
+  });
+  const body = h('div.sbody', {},
+    h('div.fid', { style: { marginBottom: '12px' } }, avatarEl(fid),
+      h('span.fwho', {}, h('div.fname', { style: { fontSize: '16px' } }, displayName(fid)))),
+    log,
+    h('div.crow', {}, inp, sendBtn),
+    err);
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {},
+      h('span', { style: { fontSize: '11.5px', color: 'var(--ink3)' } }, 'Messages refresh on their own'),
+      h('button.btn.small', { onclick: closeModal }, 'Close')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+  // Scroll only works once the log is really in the document and has a height.
+  setTimeout(() => { log.scrollTop = log.scrollHeight; inp.focus(); }, 0);
 }
 
 function wishCard(w) {
@@ -2770,6 +3402,7 @@ function boot() {
     window.addEventListener('hashchange', route);
     route();
     initSync();
+    initFriends();
     maybeShowWelcome();
   });
   if (!storageOK) {
