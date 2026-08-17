@@ -79,6 +79,9 @@ input,select,textarea{font:inherit;color:var(--ink)}
 @keyframes mpulse{50%{filter:brightness(1.4)}}
 #menuBtn{width:32px;height:32px;border-radius:8px;font-size:18px;line-height:1;color:var(--ink2)}
 #menuBtn:hover{background:var(--accent-soft);color:var(--ink)}
+#themeBtn{width:32px;height:32px;border-radius:8px;color:var(--ink2);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+#themeBtn:hover{background:var(--accent-soft);color:var(--ink)}
+#themeBtn svg{width:17px;height:17px;display:block}
 #menuPop{
   position:absolute;top:50px;right:12px;background:var(--surface);border:1px solid var(--line);
   border-radius:12px;box-shadow:var(--shadow-big);padding:6px;min-width:200px;display:none;z-index:60;
@@ -167,8 +170,10 @@ main{flex:1;min-height:0;position:relative}
 #todayPanel .tpDot{flex:0 0 auto;width:9px;height:9px;border-radius:3px;border:1px solid rgba(0,0,0,.14)}
 #todayPanel .tpText{flex:1;min-width:0;font-size:12.5px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 #todayPanel .tpX{flex:0 0 auto;width:20px;height:20px;border-radius:6px;color:var(--ink3);font-size:12px;line-height:1;visibility:hidden}
-#todayPanel .tpRow:hover .tpX{visibility:visible}
+#todayPanel .tpRow:hover .tpX,#todayPanel .tpX:focus-visible{visibility:visible}
 #todayPanel .tpX:hover{color:var(--danger);background:var(--danger-soft)}
+/* Nothing to hover with on a touch screen, so the way off the list is simply always there. */
+@media (hover:none){ #todayPanel .tpX{visibility:visible} }
 @media (max-width:620px){
   #todayPanel{width:190px;left:10px;top:10px}
 }
@@ -182,6 +187,7 @@ main{flex:1;min-height:0;position:relative}
   transition:box-shadow .15s ease, transform .15s ease;
 }
 .note:hover{box-shadow:0 2px 4px rgba(23,22,27,.16),0 10px 22px rgba(23,22,27,.2)}
+.note.editing{padding-right:12px} /* the sun is not drawn while typing, so give the width back */
 .note.dragging{cursor:grabbing;transform:scale(1.04) rotate(-.6deg);box-shadow:0 6px 14px rgba(23,22,27,.2),0 18px 40px rgba(23,22,27,.28);z-index:999}
 .note .chk{
   position:absolute;left:8px;top:9px;width:19px;height:19px;border-radius:50%;
@@ -355,8 +361,27 @@ main{flex:1;min-height:0;position:relative}
 .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
 .meta .mitem{display:flex;flex-direction:column;gap:2px}
 .meta .mval{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
-.sfoot{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--line);background:var(--raise)}
-.sfoot .screated{font-size:11.5px;font-weight:700;color:var(--ink3)}
+.sfoot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;border-top:1px solid var(--line);background:var(--raise)}
+.sfoot .screated{font-size:11.5px;font-weight:700;color:var(--ink3);white-space:nowrap}
+/* the task's category, sitting with the dates rather than taking a section of its own */
+.sfoot .catbtn{
+  display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--line2);background:var(--surface);font-size:12px;font-weight:700;
+  color:var(--ink2);min-width:0;max-width:180px;
+}
+.sfoot .catbtn:hover{border-color:var(--ink3);color:var(--ink)}
+.sfoot .catbtn .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.sfoot .catbtn .dot.nodot{border:1px dashed var(--ink3)}
+.sfoot .catbtn .catname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catpop{
+  position:fixed;z-index:1450;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow-big);padding:12px;width:280px;max-width:calc(100vw - 24px);
+}
+.catpop .label{display:block;margin-bottom:9px}
+@media (max-width:520px){
+  .sfoot{flex-wrap:wrap}
+  .sfoot .catbtn{max-width:130px}
+}
 
 /* ---------- archive ---------- */
 .filters{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:18px}
@@ -659,6 +684,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
     </nav>
     <div id="meters" title="Progress today. Click to manage goals"></div>
     <button id="syncChip" title="Sync status"><span class="sdot"></span><span class="stext">Local</span></button>
+    <button id="themeBtn" aria-label="Switch to dark" title="Switch to dark"></button>
     <button id="menuBtn" aria-label="Menu" aria-haspopup="true">⋯</button>
     <div id="menuPop" role="menu">
       <button id="mSettings">Account &amp; sync</button>
@@ -785,6 +811,51 @@ let storageOK = true;
 const memStore = {};
 function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { storageOK = false; return memStore[k] || null; } }
 function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { storageOK = false; memStore[k] = v; } }
+
+/* ---------- light and dark ---------- */
+// Which way this screen looks is a property of the screen, not of the account, so the
+// choice stays in this browser rather than syncing. Nothing stamped on the root element
+// means "whatever this device prefers"; a stamp means someone decided.
+const THEME_KEY = 'dayu-theme';
+// Applied the moment the script runs, before anything is drawn, so the page never flashes
+// the wrong theme on the way in.
+(function initTheme() {
+  const saved = storeGet(THEME_KEY);
+  if (saved === 'dark' || saved === 'light') document.documentElement.setAttribute('data-theme', saved);
+})();
+const SUN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M18.9 5.1l-1.4 1.4M6.5 17.5l-1.4 1.4"/></svg>';
+const MOON_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.2A8.2 8.2 0 0 1 9.8 4 8.4 8.4 0 1 0 20 14.2z"/></svg>';
+function systemPrefersDark() {
+  try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; }
+}
+function activeTheme() {
+  return document.documentElement.getAttribute('data-theme') || (systemPrefersDark() ? 'dark' : 'light');
+}
+function paintThemeBtn() {
+  const b = $('#themeBtn');
+  if (!b) return;
+  const dark = activeTheme() === 'dark';
+  b.innerHTML = dark ? SUN_SVG : MOON_SVG;   // the icon shows what the next press gives you
+  b.title = dark ? 'Switch to light' : 'Switch to dark';
+  b.setAttribute('aria-label', b.title);
+  b.setAttribute('aria-pressed', dark ? 'true' : 'false');
+}
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  storeSet(THEME_KEY, t);
+  paintThemeBtn();
+}
+function wireTheme() {
+  paintThemeBtn();
+  const b = $('#themeBtn');
+  if (b) b.addEventListener('click', () => setTheme(activeTheme() === 'dark' ? 'light' : 'dark'));
+  // Until someone chooses, the device decides, so follow it if it changes under us.
+  try {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (!storeGet(THEME_KEY)) paintThemeBtn();
+    });
+  } catch (e) { /* older browsers just keep the icon they have */ }
+}
 
 /* ---------- state ---------- */
 let STATE = null;
@@ -1485,7 +1556,9 @@ async function syncNow() {
     const localTs = (STATE.meta && STATE.meta.updatedAt) || 0;
     const remoteTs = remote ? Date.parse(remote.updated_at) : 0;
     // Never swap the board out from under an open sheet: the user may be mid-edit in it.
-    const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging;
+    // A title being typed on a card counts as busy too: rebuilding the board around it
+    // both loses the text and throws from inside the removal loop.
+    const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging || $('.note textarea');
     if (remote && remoteTs > localTs + 500 && !busy) {
       STATE = migrate(remote.data);
       STATE.meta.updatedAt = remoteTs;
@@ -1964,6 +2037,9 @@ let renderedDay = '';
 let dayTimer = null;
 function dayFlipCheck() {
   if (todayKey() === renderedDay) return;
+  // Finish any title being typed first. Rebuilding the board would tear the textarea out
+  // mid-edit, which fires its blur listener inside the removal loop and throws.
+  commitOpenNoteEditor();
   // Never rebuild the canvas out from under an open sheet or a gesture in progress.
   if (modalNoteId || zoneDragging || $('.note.dragging')) { setTimeout(dayFlipCheck, 2000); return; }
   renderCanvas();
@@ -1977,6 +2053,9 @@ function scheduleDayFlip() {
 function renderTodayPanel() {
   const box = $('#todayPanel');
   if (!box) return;
+  // The board redraws for all sorts of reasons; a list scrolled halfway down should not
+  // jump back to the top each time.
+  const keepScroll = (box.querySelector('.tpBody') || {}).scrollTop || 0;
   box.innerHTML = '';
   const list = todayNotes();
   const collapsed = storeGet(TODAY_COLLAPSE_KEY) === '1';
@@ -1991,7 +2070,7 @@ function renderTodayPanel() {
   if (collapsed) return;
   const body = h('div.tpBody');
   if (!list.length) {
-    body.append(h('div.tpEmpty', {}, 'Hover a task and press its sun to line it up for today. It stays where it is on the canvas.'));
+    body.append(h('div.tpEmpty', {}, 'Press the sun on any task to line it up for today. It stays where it is on the canvas.'));
   }
   for (const n of list) {
     const row = h('div.tpRow', { title: 'Show me on the canvas' },
@@ -2002,6 +2081,7 @@ function renderTodayPanel() {
     body.append(row);
   }
   box.append(body);
+  if (keepScroll) body.scrollTop = keepScroll;
 }
 
 /* ---------- zones ---------- */
@@ -2137,6 +2217,7 @@ function buildNote(n) {
   el.append(chk);
 
   if (n.editing) {
+    el.classList.add('editing'); // no sun while typing, so the corner it reserves is given back
     const ta = h('textarea', { rows: 2, placeholder: 'What needs doing?', value: n.title });
     const commit = () => {
       delete n.editing;
@@ -2402,26 +2483,40 @@ function contentBounds() {
   }
   return isFinite(minX) ? { minX, minY, maxX, maxY } : null;
 }
+// Today's panel sits over the top-left of the board, so fitting to the whole board would
+// park tasks underneath it where they cannot be clicked. This is the corner it owns.
+function fitInset() {
+  const p = $('#todayPanel'), board = $('#board');
+  if (!p || !board) return { left: 0, top: 0 };
+  const rb = board.getBoundingClientRect(), rp = p.getBoundingClientRect();
+  if (!rp.width || !rp.height) return { left: 0, top: 0 };
+  const left = rp.right - rb.left + 12;
+  // On a narrow screen the panel takes most of the width, so give way downwards instead.
+  return (rb.width - left) >= NOTE_W + 80 ? { left, top: 0 } : { left: 0, top: rp.bottom - rb.top + 12 };
+}
 // First look at a board in this browser. Leave it at 1:1 when there is already something
 // on screen, and only reframe when the content would otherwise be off in blank space.
 function initialView() {
   const rb = $('#board').getBoundingClientRect();
   const b = contentBounds();
   if (!b) return;
-  const anyVisible = b.maxX > 0 && b.maxY > 0 && b.minX < rb.width && b.minY < rb.height;
-  if (anyVisible) { panX = 0; panY = 0; zoom = 1; applyView(); return; }
+  const ins = fitInset();
+  const anyVisible = b.maxX > ins.left && b.maxY > ins.top && b.minX < rb.width && b.minY < rb.height;
+  if (anyVisible) { panX = ins.left; panY = ins.top; zoom = 1; applyView(); return; }
   recenter();
 }
 // Bring everything back into view. The way home when you have wandered off into blank space.
 function recenter() {
   const rb = $('#board').getBoundingClientRect();
   const b = contentBounds();
-  if (!b) { zoom = 1; panX = rb.width / 2 - NOTE_W; panY = rb.height / 2 - 120; applyView(); return; }
+  const ins = fitInset();
+  const vw = Math.max(120, rb.width - ins.left), vh = Math.max(120, rb.height - ins.top);
+  if (!b) { zoom = 1; panX = ins.left + vw / 2 - NOTE_W; panY = ins.top + vh / 2 - 120; applyView(); return; }
   const pad = 70;
   const w = (b.maxX - b.minX) + pad * 2, hgt = (b.maxY - b.minY) + pad * 2;
-  zoom = clamp(Math.min(rb.width / w, rb.height / hgt, 1), ZOOM_MIN, ZOOM_MAX);
-  panX = rb.width / 2 - ((b.minX + b.maxX) / 2) * zoom;
-  panY = rb.height / 2 - ((b.minY + b.maxY) / 2) * zoom;
+  zoom = clamp(Math.min(vw / w, vh / hgt, 1), ZOOM_MIN, ZOOM_MAX);
+  panX = ins.left + vw / 2 - ((b.minX + b.maxX) / 2) * zoom;
+  panY = ins.top + vh / 2 - ((b.minY + b.maxY) / 2) * zoom;
   applyView();
 }
 
@@ -2563,7 +2658,11 @@ function wireCanvas() {
     return false;
   };
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { setDrawMode(false); setPlaceMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
+    if (e.key === 'Escape') {
+      // A picker on top of the sheet takes the first Escape; the sheet itself takes the next.
+      if ($('.catpop')) { closeCatPop(); return; }
+      setDrawMode(false); setPlaceMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove());
+    }
     if (e.code === 'Space' && spaceIsOurs(e.target)) {
       if (!spaceHeld) { spaceHeld = true; board.classList.add('panready'); }
       e.preventDefault(); // stop the page from scrolling under us
@@ -2678,6 +2777,7 @@ function zoneEditPopover(z, atX, atY) {
 let modalNoteId = null;
 let modalOnClose = null; // a modal with tidying to do (the chat) registers here; every close path runs it
 function closeModal() {
+  closeCatPop();
   const root = $('#modalRoot');
   if (!root.classList.contains('open')) return;
   root.classList.remove('open'); root.innerHTML = '';
@@ -2687,6 +2787,11 @@ function closeModal() {
   if (currentPage() === 'archive') renderArchive();
 }
 function openNote(id) {
+  // A title still being typed on a card belongs in state before the sheet reads it. The
+  // card's own pointerdown calls preventDefault, so the textarea keeps focus and no blur
+  // has fired: without this the sheet opens showing an empty title and closing it saves
+  // that emptiness over what was typed.
+  commitOpenNoteEditor();
   const n = noteById(id);
   if (!n) return;
   // Re-entry would tear the open sheet down and rebuild it, losing whatever was being
@@ -2762,19 +2867,30 @@ function openNote(id) {
     stepsBox));
   renderSteps(n, stepsBox);
 
-  // category picker
-  const pick = h('div.catpick');
-  body.append(h('div.sec', {}, h('div.sechead', {}, h('span.label', {}, 'Category')), pick));
-  renderCatPick(n, pick, sheet);
-
   // completion date, if any, stays with the other detail up here; creation date moves to the footer below
   if (n.completedAt) {
     body.append(h('div.meta', {}, h('div.mitem', {}, h('span.label', {}, 'Completed'), h('span.mval', {}, fmtFull(n.completedAt)))));
   }
 
+  // The category lives in the footer beside the dates rather than taking a section of its
+  // own. It still opens the full picker, so a task can be filed without a cluster to drop
+  // it into.
+  const catChip = h('button.catbtn', { title: 'Change the category' });
+  const paintCat = () => {
+    catChip.innerHTML = '';
+    const c = catById(n.catId);
+    const pal = c ? palById(c.color) : null;
+    catChip.append(
+      h('span.dot' + (c ? '' : '.nodot'), pal ? { style: { background: pal.bg, border: '1px solid ' + pal.deep } } : {}),
+      h('span.catname', {}, c ? c.name : 'No category'));
+  };
+  paintCat();
+  catChip.addEventListener('click', () => openCatPicker(n, sheet, catChip, paintCat));
+
   // footer
   sheet.append(h('div.sfoot', {},
     h('button.btn.danger.small', { onclick: () => { closeModal(); undoableAction('Task deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); }); } }, 'Delete'),
+    catChip,
     h('span.screated', { title: fmtFull(n.createdAt) }, 'Created ' + fmtDY(n.createdAt)),
     h('button.btn.small', { onclick: closeModal }, 'Close')));
 
@@ -2808,12 +2924,40 @@ function renderSteps(n, box) {
   box.append(h('div.addstep', {}, h('span.plus', {}, '+'), addInp));
 }
 
-function renderCatPick(n, pick, sheet) {
+// The picker itself, shown in a popover from the footer chip. `onChange` keeps that chip
+// in step with whatever is chosen here.
+function openCatPicker(n, sheet, anchor, onChange) {
+  closeCatPop();
+  const pick = h('div.catpick');
+  const pop = h('div.catpop', { role: 'dialog', 'aria-label': 'Category' }, h('span.label', {}, 'Category'), pick);
+  document.body.append(pop);
+  renderCatPick(n, pick, sheet, onChange);
+  const ar = anchor.getBoundingClientRect();
+  const pr = pop.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(ar.left, innerWidth - pr.width - 8)) + 'px';
+  const above = ar.top - pr.height - 8;               // it opens upward, since the chip sits at the bottom
+  pop.style.top = (above >= 8 ? above : Math.max(8, Math.min(ar.bottom + 8, innerHeight - pr.height - 8))) + 'px';
+  if (!catPopWired) {
+    catPopWired = true;
+    document.addEventListener('pointerdown', ev => {
+      const p = $('.catpop');
+      if (p && !p.contains(ev.target) && !ev.target.closest('.catbtn')) closeCatPop();
+    }, true);
+  }
+}
+function closeCatPop() { $$('.catpop').forEach(p => p.remove()); }
+let catPopWired = false;
+function renderCatPick(n, pick, sheet, onChange) {
   pick.innerHTML = '';
   for (const c of STATE.cats) {
     const pal = palById(c.color);
     const on = n.catId === c.id;
-    pick.append(h('button.chip' + (on ? '.on' : ''), { onclick: () => { n.catId = on ? null : c.id; save(); renderCatPick(n, pick, sheet); $('.ctab', sheet).style.background = n.catId ? pal.bg : DEFAULT_NOTE_BG; } },
+    pick.append(h('button.chip' + (on ? '.on' : ''), { onclick: () => {
+      n.catId = on ? null : c.id;
+      save(); renderCatPick(n, pick, sheet, onChange);
+      $('.ctab', sheet).style.background = n.catId ? pal.bg : DEFAULT_NOTE_BG;
+      if (onChange) onChange();
+    } },
       h('span.dot', { style: { background: pal.bg, border: '1px solid ' + pal.deep } }), c.name));
   }
   const newBtn = h('button.chip', { onclick: () => {
@@ -2823,10 +2967,11 @@ function renderCatPick(n, pick, sheet) {
         const color = (PAL.filter(p => !STATE.cats.some(c => c.color === p.id))[0] || PAL[STATE.cats.length % PAL.length]).id;
         const c = { id: uid(), name: inp.value.trim(), color };
         STATE.cats.push(c); n.catId = c.id;
-        save(); renderCatPick(n, pick, sheet);
+        save(); renderCatPick(n, pick, sheet, onChange);
         $('.ctab', sheet).style.background = palById(color).bg;
+        if (onChange) onChange();
       }
-      if (e.key === 'Escape') renderCatPick(n, pick, sheet);
+      if (e.key === 'Escape') renderCatPick(n, pick, sheet, onChange);
     });
     newBtn.replaceWith(inp); inp.focus();
   } }, '＋ New');
@@ -3858,6 +4003,7 @@ function boot() {
   STATE = loadState();
   storeSet(STORE_KEY, storeGet(STORE_KEY) || JSON.stringify(STATE)); // probe storage
   for (const g of STATE.goals) metBefore[g.id] = goalMet(g);
+  wireTheme();
   wireMenu();
   wireCanvas();
   wireTabs();
