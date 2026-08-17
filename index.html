@@ -95,18 +95,19 @@ main{flex:1;min-height:0;position:relative}
 .doc .sub{color:var(--ink2);margin-bottom:24px}
 
 /* ---------- canvas ---------- */
-#board{position:absolute;inset:0;overflow:auto;z-index:0} /* own stacking context, so raised notes stay under the toolbar */
-#field{
-  position:relative;width:2600px;height:1800px;
+/* The board is the window; the field is an unbounded plane moved under it by transform,
+   so notes and clusters can sit at any coordinate, negative included. */
+#board{
+  position:absolute;inset:0;overflow:hidden;z-index:0; /* own stacking context, so raised notes stay under the toolbar */
   background-image:radial-gradient(var(--dots) 1.2px,transparent 1.2px);
   background-size:24px 24px;
   cursor:grab;
   touch-action:none; /* drags on the canvas are ours: panning is done in script */
-  transform-origin:0 0; /* the wheel zooms from here; script sets the scale itself */
 }
-#field.panready{cursor:grab}
-#field.panning{cursor:grabbing;user-select:none}
-#field.drawing{cursor:crosshair}
+#board.panready{cursor:grab}
+#board.panning{cursor:grabbing;user-select:none}
+#board.drawing{cursor:crosshair}
+#field{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
 .hint{
   position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
   color:var(--ink3);font-size:15px;text-align:center;pointer-events:none;user-select:none;
@@ -552,6 +553,10 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
         <button id="btnZone" title="Draw a cluster area, then drop notes into it">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.5 3" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="3"/></svg>
           Cluster
+        </button>
+        <button id="btnHome" title="Fit everything back on screen">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg>
+          Fit
         </button>
       </div>
     </section>
@@ -1513,15 +1518,17 @@ function noteBg(n) { const c = catById(n.catId); return c ? palById(c.color).bg 
 
 /* ---------- canvas render ---------- */
 function renderCanvas() {
-  const field = $('#field');
-  $$('.note, .zone, .hint, .zonepop', field).forEach(el => el.remove());
+  const field = $('#field'), board = $('#board');
+  $$('.note, .zone, .zonepop', field).forEach(el => el.remove());
+  $$('.hint', board).forEach(el => el.remove());
 
   for (const z of STATE.zones) field.append(buildZone(z));
   const live = STATE.notes.filter(n => !n.archived);
   for (const n of live) field.append(buildNote(n));
 
+  // The hint belongs to the window, not the plane, so it stays put while you pan.
   if (!live.length && !STATE.zones.length) {
-    field.append(h('div.hint', {},
+    board.append(h('div.hint', {},
       h('div', { style: { fontSize: '34px', marginBottom: '10px' } }, '📌'),
       h('div', {}, h('b', {}, 'Double-click anywhere'), ' to pin your first note.'),
       h('div', { style: { marginTop: '4px' } }, 'Then draw a cluster and drag notes into it.')));
@@ -1554,7 +1561,7 @@ function buildZone(z) {
     if (e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
     dragXY(e, rz, (dx, dy) => {
-      z.w = clamp(z.w + dx, 130, 2600 - z.x); z.h = clamp(z.h + dy, 100, 1800 - z.y);
+      z.w = Math.max(130, z.w + dx); z.h = Math.max(100, z.h + dy); // no upper bound, only a floor
       el.style.width = z.w + 'px'; el.style.height = z.h + 'px';
     }, () => save());
   });
@@ -1581,16 +1588,6 @@ function startZoneDrag(z, e, grabEl) {
   const zx0 = z.x, zy0 = z.y;
   const sx = e.clientX, sy = e.clientY;
   let moved = false;
-  // A rider's centre can sit inside the area while its body hangs outside it, so the
-  // travel allowed is whatever BOTH the area and every passenger can absorb.
-  let minDx = -zx0, maxDx = (2600 - z.w) - zx0;
-  let minDy = 14 - zy0, maxDy = (1800 - z.h) - zy0;
-  for (const r of riders) {
-    minDx = Math.max(minDx, -r.x0);
-    maxDx = Math.min(maxDx, (2600 - NOTE_W) - r.x0);
-    minDy = Math.max(minDy, -r.y0);
-    maxDy = Math.min(maxDy, (1800 - 70) - r.y0);
-  }
   zoneDragging = true;
   try { grabEl.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
   const place = (dx, dy) => {
@@ -1610,7 +1607,7 @@ function startZoneDrag(z, e, grabEl) {
       el.classList.add('moving');
     }
     if (ev.cancelable) ev.preventDefault();
-    place(clamp(rawX / zoom, minDx, maxDx), clamp(rawY / zoom, minDy, maxDy));
+    place(rawX / zoom, rawY / zoom);
   };
   const teardown = () => {
     zoneDragging = false;
@@ -1707,7 +1704,7 @@ function buildNote(n) {
         n.z = ++STATE.zTop; el.style.zIndex = n.z;
       }
       if (moved) {
-        n.x = clamp(ox + rawX / zoom, 0, 2600 - NOTE_W); n.y = clamp(oy + rawY / zoom, 0, 1800 - 70);
+        n.x = ox + rawX / zoom; n.y = oy + rawY / zoom; // the plane has no edges
         el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
       }
     };
@@ -1771,7 +1768,7 @@ function dropChip(x, y, text) {
 /* ---------- create notes ---------- */
 function newNoteAt(x, y) {
   const n = {
-    id: uid(), title: '', desc: '', x: clamp(x, 0, 2600 - NOTE_W), y: clamp(y, 0, 1800 - 70),
+    id: uid(), title: '', desc: '', x, y,
     catId: (zoneAt(x + NOTE_W / 2, y + 35) || {}).catId || null,
     createdAt: Date.now(), completedAt: null, archived: false, steps: [], z: ++STATE.zTop, editing: true,
   };
@@ -1779,10 +1776,9 @@ function newNoteAt(x, y) {
   save(); renderCanvas();
 }
 function newNoteCenter() {
-  const b = $('#board');
-  const x = b.scrollLeft + b.clientWidth / 2 - NOTE_W / 2 + (Math.random() * 60 - 30);
-  const y = b.scrollTop + b.clientHeight / 2 - 60 + (Math.random() * 60 - 30);
-  newNoteAt(x, y);
+  const rb = $('#board').getBoundingClientRect();
+  const c = toCanvas(rb.left + rb.width / 2, rb.top + rb.height / 2);
+  newNoteAt(c.x - NOTE_W / 2 + (Math.random() * 60 - 30), c.y - 60 + (Math.random() * 60 - 30));
 }
 
 /* ---------- complete / archive flow ---------- */
@@ -1819,24 +1815,89 @@ function toggleDone(id) {
   }, 620);
 }
 
-/* ---------- zoom (mouse wheel) ---------- */
-let zoom = 1;
-const ZOOM_MIN = 0.5, ZOOM_MAX = 2;
-// Rescale around a screen point (the cursor, by default the viewport centre) so that
-// point stays under the cursor instead of the canvas jumping.
+/* ---------- the view: an unbounded plane seen through the board ---------- */
+let zoom = 1, panX = 0, panY = 0;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 2.5;
+const VIEW_KEY = 'dayu-view-v1';
+let viewSaveTimer = null;
+// Where you were looking is a property of this screen, not of the account, so it stays
+// in this browser rather than syncing.
+function saveView() {
+  clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(() => storeSet(VIEW_KEY, JSON.stringify({ panX, panY, zoom })), 400);
+}
+function loadView() {
+  try {
+    const v = JSON.parse(storeGet(VIEW_KEY) || 'null');
+    if (v && isFinite(v.panX) && isFinite(v.panY)) {
+      panX = v.panX; panY = v.panY;
+      zoom = clamp(isFinite(v.zoom) ? v.zoom : 1, ZOOM_MIN, ZOOM_MAX);
+    }
+  } catch (e) { /* first visit */ }
+}
+function applyView() {
+  const field = $('#field'), board = $('#board');
+  field.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoom + ')';
+  // The dots live on the board and are shifted to match, so the ground appears to move.
+  board.style.backgroundSize = (24 * zoom) + 'px ' + (24 * zoom) + 'px';
+  board.style.backgroundPosition = panX + 'px ' + panY + 'px';
+  saveView();
+}
+// A point on screen, in the plane's own coordinates.
+function toCanvas(clientX, clientY) {
+  const rb = $('#board').getBoundingClientRect();
+  return { x: (clientX - rb.left - panX) / zoom, y: (clientY - rb.top - panY) / zoom };
+}
+// Rescale around a screen point (the cursor, by default the middle of the view) so that
+// point stays put instead of the canvas lurching.
 function setZoom(newZoom, clientX, clientY) {
   newZoom = clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
   if (newZoom === zoom) return;
-  const board = $('#board'), field = $('#field');
-  const rb = board.getBoundingClientRect();
-  const px = (clientX == null ? rb.left + rb.width / 2 : clientX) - rb.left;
-  const py = (clientY == null ? rb.top + rb.height / 2 : clientY) - rb.top;
-  const logicalX = (board.scrollLeft + px) / zoom;
-  const logicalY = (board.scrollTop + py) / zoom;
+  const rb = $('#board').getBoundingClientRect();
+  const px = clientX == null ? rb.width / 2 : clientX - rb.left;
+  const py = clientY == null ? rb.height / 2 : clientY - rb.top;
+  const cx = (px - panX) / zoom, cy = (py - panY) / zoom;
   zoom = newZoom;
-  field.style.transform = 'scale(' + zoom + ')';
-  board.scrollLeft = logicalX * zoom - px;
-  board.scrollTop = logicalY * zoom - py;
+  panX = px - cx * zoom;
+  panY = py - cy * zoom;
+  applyView();
+}
+// Bounding box of everything on the plane, or null when it is empty.
+function contentBounds() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const n of STATE.notes) {
+    if (n.archived) continue;
+    const el = $('.note[data-id="' + n.id + '"]');
+    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + NOTE_W); maxY = Math.max(maxY, n.y + (el ? el.offsetHeight : 90));
+  }
+  for (const z of STATE.zones) {
+    minX = Math.min(minX, z.x); minY = Math.min(minY, z.y);
+    maxX = Math.max(maxX, z.x + z.w); maxY = Math.max(maxY, z.y + z.h);
+  }
+  return isFinite(minX) ? { minX, minY, maxX, maxY } : null;
+}
+// First look at a board in this browser. Leave it at 1:1 when there is already something
+// on screen, and only reframe when the content would otherwise be off in blank space.
+function initialView() {
+  const rb = $('#board').getBoundingClientRect();
+  const b = contentBounds();
+  if (!b) return;
+  const anyVisible = b.maxX > 0 && b.maxY > 0 && b.minX < rb.width && b.minY < rb.height;
+  if (anyVisible) { panX = 0; panY = 0; zoom = 1; applyView(); return; }
+  recenter();
+}
+// Bring everything back into view. The way home when you have wandered off into blank space.
+function recenter() {
+  const rb = $('#board').getBoundingClientRect();
+  const b = contentBounds();
+  if (!b) { zoom = 1; panX = rb.width / 2 - NOTE_W; panY = rb.height / 2 - 120; applyView(); return; }
+  const pad = 70;
+  const w = (b.maxX - b.minX) + pad * 2, hgt = (b.maxY - b.minY) + pad * 2;
+  zoom = clamp(Math.min(rb.width / w, rb.height / hgt, 1), ZOOM_MIN, ZOOM_MAX);
+  panX = rb.width / 2 - ((b.minX + b.maxX) / 2) * zoom;
+  panY = rb.height / 2 - ((b.minY + b.maxY) / 2) * zoom;
+  applyView();
 }
 
 /* ---------- draw-cluster mode ---------- */
@@ -1847,12 +1908,15 @@ function setDrawMode(on) {
   if (!on && cancelDraw) cancelDraw();
   drawMode = on;
   $('#btnZone').classList.toggle('on', on);
-  $('#field').classList.toggle('drawing', on);
+  $('#board').classList.toggle('drawing', on);
 }
 function wireCanvas() {
   const board = $('#board'), field = $('#field');
   $('#btnNote').addEventListener('click', newNoteCenter);
   $('#btnZone').addEventListener('click', () => setDrawMode(!drawMode));
+  $('#btnHome').addEventListener('click', recenter);
+  loadView();
+  applyView();
 
   // The wheel zooms the canvas instead of scrolling the page. Panning still works by
   // dragging (see below), so nothing is lost by repurposing the wheel this way.
@@ -1860,89 +1924,95 @@ function wireCanvas() {
     e.preventDefault();
     setZoom(zoom * Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY);
   }, { passive: false });
+  // The view is expressed in screen pixels, so a resized window needs no correction,
+  // but a board that was hidden at load (another page open) has no size until shown.
+  window.addEventListener('resize', () => applyView());
 
-  field.addEventListener('dblclick', e => {
-    if (e.target !== field) return;
-    const r = field.getBoundingClientRect();
-    newNoteAt((e.clientX - r.left) / zoom - NOTE_W / 2, (e.clientY - r.top) / zoom - 20);
+  // The field has no size of its own now, so the board is what a pointer actually lands on.
+  const onBareCanvas = t => t === board || t === field;
+
+  board.addEventListener('dblclick', e => {
+    if (!onBareCanvas(e.target)) return;
+    const c = toCanvas(e.clientX, e.clientY);
+    newNoteAt(c.x - NOTE_W / 2, c.y - 20);
   });
 
   // Empty canvas drags the view; empty space inside a cluster drags that cluster and its
   // contents. Middle button, or space held, always pans so a big cluster cannot trap you.
-  field.addEventListener('pointerdown', e => {
+  board.addEventListener('pointerdown', e => {
     if (drawMode) return;
     const panOverride = e.button === 1 || spaceHeld;
     if (e.button !== 0 && !panOverride) return;
     if (e.target.closest('.note, .zhead, .zresize, .zonepop')) return;
     commitOpenNoteEditor(); // finish any title being typed before taking over the gesture
     if (!panOverride) {
-      const fr = field.getBoundingClientRect();
-      const z = zoneAt((e.clientX - fr.left) / zoom, (e.clientY - fr.top) / zoom);
-      if (z) { startZoneDrag(z, e, field); return; }
+      const c = toCanvas(e.clientX, e.clientY);
+      const z = zoneAt(c.x, c.y);
+      if (z) { startZoneDrag(z, e, board); return; }
     }
     const sx = e.clientX, sy = e.clientY;
-    const sl = board.scrollLeft, st = board.scrollTop;
+    const p0x = panX, p0y = panY;
     let panning = false;
     // Capture up front, so releasing over the toolbar or outside the window still ends the pan.
-    try { field.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    try { board.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
       if (ev.pointerId !== e.pointerId) return;
       const dx = ev.clientX - sx, dy = ev.clientY - sy;
       if (!panning) {
         if (Math.abs(dx) + Math.abs(dy) < 4) return;
         panning = true;
-        field.classList.add('panning');
+        board.classList.add('panning');
       }
       if (ev.cancelable) ev.preventDefault(); // only once this is genuinely a drag
-      board.scrollLeft = sl - dx;
-      board.scrollTop = st - dy;
+      panX = p0x + dx; panY = p0y + dy;
+      applyView();
     };
     const up = ev => {
       if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
-      field.removeEventListener('pointermove', mv);
-      field.removeEventListener('pointerup', up);
-      field.removeEventListener('pointercancel', up);
+      board.removeEventListener('pointermove', mv);
+      board.removeEventListener('pointerup', up);
+      board.removeEventListener('pointercancel', up);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
-      field.classList.remove('panning');
-      try { field.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      board.classList.remove('panning');
+      try { board.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
     };
-    field.addEventListener('pointermove', mv);
-    field.addEventListener('pointerup', up);
-    field.addEventListener('pointercancel', up);
+    board.addEventListener('pointermove', mv);
+    board.addEventListener('pointerup', up);
+    board.addEventListener('pointercancel', up);
     // Backstop: if capture ever fails to take, the release still reaches us here.
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   });
 
-  field.addEventListener('pointerdown', e => {
-    if (!drawMode || e.target !== field || e.button !== 0) return;
+  board.addEventListener('pointerdown', e => {
+    if (!drawMode || !onBareCanvas(e.target) || e.button !== 0) return;
     e.preventDefault();
-    const r = field.getBoundingClientRect();
-    const ax = (e.clientX - r.left) / zoom, ay = (e.clientY - r.top) / zoom;
+    const a = toCanvas(e.clientX, e.clientY);
+    const ax = a.x, ay = a.y;
     const prev = $('#drawPreview');
     prev.style.display = 'block';
     let w = 0, hgt = 0, x = ax, y = ay;
-    try { field.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    try { board.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
-      const bx = (ev.clientX - r.left) / zoom, by = (ev.clientY - r.top) / zoom;
-      x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hgt = Math.abs(by - ay);
+      const b2 = toCanvas(ev.clientX, ev.clientY);
+      x = Math.min(ax, b2.x); y = Math.min(ay, b2.y); w = Math.abs(b2.x - ax); hgt = Math.abs(b2.y - ay);
       Object.assign(prev.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hgt + 'px' });
     };
     const finish = commit => {
       if (!cancelDraw) return;     // already torn down
       cancelDraw = null;           // cleared first, so setDrawMode below cannot recurse
-      field.removeEventListener('pointermove', mv); field.removeEventListener('pointerup', up); field.removeEventListener('pointercancel', up);
-      try { field.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      board.removeEventListener('pointermove', mv); board.removeEventListener('pointerup', up); board.removeEventListener('pointercancel', up);
+      try { board.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
       prev.style.display = 'none';
       setDrawMode(false);
       if (commit && w > 70 && hgt > 60) zoneNamePopover(x, y, Math.max(w, 130), Math.max(hgt, 100));
     };
     const up = () => finish(true);
     cancelDraw = () => finish(false);
-    field.addEventListener('pointermove', mv);
-    field.addEventListener('pointerup', up);
-    field.addEventListener('pointercancel', up);
+    board.addEventListener('pointermove', mv);
+    board.addEventListener('pointerup', up);
+    board.addEventListener('pointercancel', up);
   });
 
   // Space belongs to whatever is focused: it types, and it presses buttons. Only claim it
@@ -1950,20 +2020,20 @@ function wireCanvas() {
   const spaceIsOurs = t => {
     if (currentPage() !== 'canvas') return false;
     if ($('#welcome') || $('#modalRoot').classList.contains('open')) return false;
-    if (!t || t === document.body || t === field || t === $('#board')) return true;
+    if (!t || t === document.body || t === field || t === board) return true;
     return false;
   };
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { setDrawMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
     if (e.code === 'Space' && spaceIsOurs(e.target)) {
-      if (!spaceHeld) { spaceHeld = true; field.classList.add('panready'); }
+      if (!spaceHeld) { spaceHeld = true; board.classList.add('panready'); }
       e.preventDefault(); // stop the page from scrolling under us
     }
   });
   document.addEventListener('keyup', e => {
-    if (e.code === 'Space') { spaceHeld = false; field.classList.remove('panready'); }
+    if (e.code === 'Space') { spaceHeld = false; board.classList.remove('panready'); }
   });
-  window.addEventListener('blur', () => { spaceHeld = false; field.classList.remove('panready'); });
+  window.addEventListener('blur', () => { spaceHeld = false; board.classList.remove('panready'); });
 }
 
 function zoneNamePopover(x, y, w, hgt) {
@@ -3009,9 +3079,8 @@ function boot() {
       h('button', { onclick: () => sn.style.display = 'none', 'aria-label': 'Dismiss' }, '✕'),
       h('div', {}, h('b', {}, 'Preview mode: '), 'this environment can’t store data between visits. Use ⋯ → Export to keep a backup, or run Dayu from its own page for full persistence.'));
   }
-  // scroll the board so seeded content is in view
-  const b = $('#board');
-  b.scrollLeft = 40; b.scrollTop = 0;
+  // A board this browser has never panned gets framed once.
+  if (!storeGet(VIEW_KEY)) initialView();
 }
 boot();
 
