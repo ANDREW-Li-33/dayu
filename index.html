@@ -264,7 +264,6 @@ main{flex:1;min-height:0;position:relative}
 .addstep{display:flex;gap:9px;align-items:center;padding:5px 6px}
 .addstep .plus{color:var(--ink3);width:17px;text-align:center;font-weight:700}
 .addstep input{flex:1;border:none;outline:none;background:transparent;font-size:13.5px}
-.ainote{margin-top:8px;font-size:11.5px;color:var(--ink3);font-style:italic}
 .catpick{display:flex;flex-wrap:wrap;gap:6px}
 .newcat{display:flex;gap:6px;margin-top:8px}
 .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
@@ -289,19 +288,18 @@ main{flex:1;min-height:0;position:relative}
 .acard .spacer{flex:1}
 .minichip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
 .minichip .dot{width:7px;height:7px;border-radius:50%}
-.aisec{margin-top:28px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
-.aisec .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-.aiout{margin-top:14px;padding:14px 16px;border-radius:10px;background:var(--raise);border:1px solid var(--line);white-space:pre-wrap;font-size:13.5px;display:none}
-.aiout.show{display:block}
-
-/* prompts modal list */
-.plist{display:flex;flex-direction:column;gap:8px}
-.pitem{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.pitem .phead{display:flex;align-items:center;gap:8px}
-.pitem .pname{font-weight:700;flex:1}
-.pitem .ptext{color:var(--ink2);font-size:12.5px;margin-top:4px}
-.pedit{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-.pedit textarea{min-height:60px;resize:vertical}
+/* right-click delete popup */
+#ctxmenu{
+  position:fixed;z-index:1500;background:var(--surface);border:1px solid var(--line2);
+  border-radius:12px;box-shadow:var(--shadow-big);padding:12px 14px;max-width:280px;
+  animation:ctxin .1s ease;
+}
+@keyframes ctxin{from{opacity:0;transform:scale(.96)}}
+#ctxmenu .ctxq{font-size:13px;line-height:1.4;margin-bottom:10px}
+#ctxmenu .ctxq b{font-weight:700}
+#ctxmenu .ctxrow{display:flex;gap:8px;justify-content:flex-end}
+#ctxmenu .ctxyes{background:var(--danger);border-color:var(--danger);color:#fff}
+#ctxmenu .ctxyes:hover{filter:brightness(1.08)}
 
 /* ---------- goals ---------- */
 .gsplit{display:grid;grid-template-columns:1fr 1fr;gap:22px}
@@ -527,7 +525,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
     <button id="syncChip" title="Sync status"><span class="sdot"></span><span class="stext">Local</span></button>
     <button id="menuBtn" aria-label="Menu" aria-haspopup="true">⋯</button>
     <div id="menuPop" role="menu">
-      <button id="mSettings">AI &amp; sync settings</button>
+      <button id="mSettings">Account &amp; sync</button>
       <div class="sep"></div>
       <button id="mExport">Export backup (.json)</button>
       <button id="mImport">Import backup…</button>
@@ -657,51 +655,22 @@ function save() {
 }
 function blankState() {
   return {
-    v: 5, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
-    ai: { key: '', model: 'gemini-flash-latest', lastVersion: '' },
+    v: 6, notes: [], cats: [], zones: [], goals: [], wishes: [], habits: [], zTop: 10,
     meta: { updatedAt: Date.now() },
   };
-}
-function dashPromptSeeds() {
-  return [
-    { id: uid(), scope: 'dashboard', name: 'What could be better?', text: 'Look at my daily goal tracking. Tell me directly what could be improved: which goals slip most, which days are weak, and one concrete change to try. No fluff.' },
-    { id: uid(), scope: 'dashboard', name: 'Pep talk', text: 'Review my goal tracking and give me a short, honest pep talk: call out real wins and streaks, then one nudge for tomorrow.' },
-  ];
 }
 // adoptLocal is true ONLY for the board loaded out of this browser's own storage.
 // A pulled remote board or an imported backup belongs to some other context, and must
 // never inherit a key left behind by whoever used this browser last.
-function migrate(s, adoptLocal) {
+function migrate(s) {
   if (!s.meta) s.meta = { updatedAt: Date.now() };
   if (!Array.isArray(s.habits)) s.habits = [];
-  if (!Array.isArray(s.prompts)) s.prompts = [];
   if (!Array.isArray(s.notes)) s.notes = [];
-  for (const p of s.prompts) if (!p.scope) p.scope = 'archive';
-  if ((s.v || 1) < 2) {
-    s.prompts.push(...dashPromptSeeds());
-    s.v = 2;
-  }
-  if (!s.ai || typeof s.ai !== 'object') s.ai = { key: '', model: '', lastVersion: '' };
-  if (typeof s.ai.key !== 'string') s.ai.key = '';
-  if (typeof s.ai.lastVersion !== 'string') s.ai.lastVersion = '';
-  if (typeof s.ai.model !== 'string' || !s.ai.model) s.ai.model = 'gemini-flash-latest';
-  // v3: the AI key moved out of this-browser-only storage and into the synced account,
-  // so it is entered once rather than on every device. This runs exactly once.
-  if ((s.v || 1) < 3) {
-    if (adoptLocal && typeof CFG !== 'undefined' && CFG && (CFG.gemKey || CFG.gemModel)) {
-      if (!s.ai.key && CFG.gemKey) s.ai.key = CFG.gemKey;
-      if (CFG.gemModel && !/^gemini-2\./.test(CFG.gemModel)) s.ai.model = CFG.gemModel;
-      CFG.gemKey = ''; CFG.gemModel = '';   // forget it, so it can never reach another account
-      if (typeof saveCfg === 'function') saveCfg();
-    }
-    // Google retired the 2.x ids for accounts created after their cutoff. Correct a stale
-    // saved default once; afterwards the user's own pick is left alone and an unusable
-    // model reports itself through the notice bar instead of being silently overridden.
-    if (/^gemini-2\./.test(s.ai.model)) { s.ai.model = 'gemini-flash-latest'; s.ai.lastVersion = ''; }
-    s.v = 3;
-  }
-  // v4: daily-goal cells now cycle blank -> green -> yellow -> red instead of a single
-  // check, and the model picker was trimmed to two choices. Both are one-time normalizations.
+  if (!Array.isArray(s.wishes)) s.wishes = [];
+  if (!Array.isArray(s.goals)) s.goals = [];
+  if (!Array.isArray(s.cats)) s.cats = [];
+  if (!Array.isArray(s.zones)) s.zones = [];
+  // v4: daily-goal cells cycle blank -> green -> yellow -> red instead of a single check.
   if ((s.v || 1) < 4) {
     for (const hb of s.habits) {
       if (!hb.days || typeof hb.days !== 'object') hb.days = {};
@@ -710,19 +679,22 @@ function migrate(s, adoptLocal) {
         if (v !== 'green' && v !== 'yellow' && v !== 'red') hb.days[k] = 'green'; // old checkmark meant "done"
       }
     }
-    if (s.ai.model !== 'gemini-flash-latest' && s.ai.model !== 'gemini-flash-lite-latest') {
-      s.ai.model = 'gemini-flash-latest'; s.ai.lastVersion = '';
-    }
     s.v = 4;
   }
   // v5: wishes can carry a shop link and a picture.
   if ((s.v || 1) < 5) {
-    if (!Array.isArray(s.wishes)) s.wishes = [];
     for (const w of s.wishes) {
       if (typeof w.url !== 'string') w.url = '';
       if (typeof w.img !== 'string') w.img = '';
     }
     s.v = 5;
+  }
+  // v6: the AI features were removed. Drop the saved key, the model choice and the
+  // summary prompts rather than leaving a disused API key sitting in the synced board.
+  if ((s.v || 1) < 6) {
+    delete s.ai;
+    delete s.prompts;
+    s.v = 6;
   }
   return s;
 }
@@ -739,18 +711,14 @@ function seedState() {
   s.notes.push(
     mk('Drag me anywhere. Make a mess, then make it make sense', 120, 120),
     mk('Drop me into the cluster on the right →', 350, 250, {}),
-    mk('Click me (don’t drag) to open the big view, then try “Draft steps”', 140, 330),
-    mk('Check my circle when you’re done with me, and watch the bar up top', 380, 430),
+    mk('Click me (don’t drag) to open the big view and break me into steps', 140, 330),
+    mk('Right-click me to delete me in two clicks', 140, 430),
+    mk('Check my circle when you’re done with me, and watch the bar up top', 380, 530),
     mk('I live here, so my category is “Getting started”', 660, 150, { catId: catStart.id }),
     mk('Draw your own cluster with the Cluster button below', 690, 280, { catId: catStart.id }),
   );
   s.goals.push({ id: uid(), name: 'Warm-up: clear 3 tasks', target: 3, period: 'week', catId: null, pinned: true, createdAt: now });
   s.wishes.push({ id: uid(), text: 'A fancy coffee, on me', goalId: s.goals[0].id, url: '', img: '', claimedAt: null, createdAt: now });
-  s.prompts.push(
-    { id: uid(), scope: 'archive', name: 'Weekly recap', text: 'Summarize what I completed, grouped by category. Keep it brief and encouraging.' },
-    { id: uid(), scope: 'archive', name: 'Find patterns', text: 'Look at my completed tasks and point out patterns: which categories dominate, what I finish fastest, and one suggestion for next week.' },
-    ...dashPromptSeeds(),
-  );
   s.habits.push(
     { id: uid(), name: 'Stretch for five minutes', order: 1, createdAt: now, archivedAt: null, days: {} },
     { id: uid(), name: 'Read 10 pages', order: 2, createdAt: now, archivedAt: null, days: {} },
@@ -763,7 +731,7 @@ function loadState() {
   if (raw) {
     try {
       const s = JSON.parse(raw);
-      if (s && Array.isArray(s.notes)) { returningUser = true; return migrate(s, true); }
+      if (s && Array.isArray(s.notes)) { returningUser = true; return migrate(s); }
     } catch (e) { /* fall through to a fresh board */ }
   }
   return seedState();
@@ -824,6 +792,37 @@ function amazonImageFor(url) {
 }
 function wishImageUrl(w) {
   return safeUrl(w.img) || amazonImageFor(w.url) || '';
+}
+
+/* ---------- right-click delete ---------- */
+// One popup, reused everywhere. It asks and deletes in the same breath: right-click,
+// then one click to confirm, with the usual Undo waiting in the toast afterwards.
+let ctxWired = false;
+function closeCtxMenu() { const m = $('#ctxmenu'); if (m) m.remove(); }
+function askDelete(e, label, onDelete) {
+  e.preventDefault(); e.stopPropagation();
+  closeCtxMenu();
+  const short = String(label || 'this').replace(/\s+/g, ' ').trim();
+  const menu = h('div', { id: 'ctxmenu', role: 'dialog', 'aria-label': 'Delete confirmation' },
+    h('div.ctxq', {}, 'Delete ', h('b', {}, short.length > 42 ? short.slice(0, 40) + '…' : short), '?'),
+    h('div.ctxrow', {},
+      h('button.btn.small.ctxno', { onclick: closeCtxMenu }, 'Keep'),
+      h('button.btn.small.ctxyes', { onclick: () => { closeCtxMenu(); onDelete(); } }, 'Delete')));
+  document.body.append(menu);
+  const r = menu.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(e.clientX, innerWidth - r.width - 8)) + 'px';
+  menu.style.top = Math.max(8, Math.min(e.clientY, innerHeight - r.height - 8)) + 'px';
+  setTimeout(() => { const y = $('.ctxyes', menu); if (y) y.focus(); }, 0);
+  if (!ctxWired) {
+    ctxWired = true;
+    document.addEventListener('pointerdown', ev => { const m = $('#ctxmenu'); if (m && !m.contains(ev.target)) closeCtxMenu(); }, true);
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeCtxMenu(); });
+    window.addEventListener('blur', closeCtxMenu);
+  }
+}
+// Attach the menu to an element, for a thing that has a name and can be deleted.
+function onRightClickDelete(el, label, onDelete) {
+  el.addEventListener('contextmenu', e => askDelete(e, label, onDelete));
 }
 
 /* ---------- undo / toast ---------- */
@@ -936,10 +935,7 @@ function renderAll() { renderMeters(); renderCanvas(); go(pageName); }
 
 /* ---------- menu: export / import / reset ---------- */
 async function exportBackup() {
-  // A backup is a file that travels. Keep the API key out of it and carry only the choice of model.
-  const payload = JSON.parse(JSON.stringify(STATE));
-  payload.ai = { key: '', model: (STATE.ai && STATE.ai.model) || 'gemini-flash-latest', lastVersion: '' };
-  const data = JSON.stringify(payload, null, 2);
+  const data = JSON.stringify(STATE, null, 2);
   const filename = 'dayu-backup-' + dayKey(Date.now()) + '.json';
   try {
     const dl = window.claude && claude.use ? await claude.use('downloads') : null;
@@ -962,9 +958,7 @@ function importBackup(file) {
       const s = JSON.parse(rd.result);
       if (!s || !Array.isArray(s.notes)) throw new Error('bad shape');
       const snap = snapshot();
-      const keptKey = (STATE.ai && STATE.ai.key) || '';
-      STATE = migrate(s, false);
-      if (!STATE.ai.key && keptKey) STATE.ai.key = keptKey; // backups carry no key; keep the one in use
+      STATE = migrate(s);
       save(); renderAll();
       toast('Backup imported', () => restore(snap));
     } catch (e) { toast('That file doesn’t look like a Dayu backup'); }
@@ -982,16 +976,12 @@ function wireMenu() {
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
   $('#mReset').addEventListener('click', () => {
     pop.classList.remove('open');
-    undoableAction('Board cleared. Your account and AI key are untouched', () => {
-      const keepAi = STATE.ai;
-      STATE = blankState();
-      STATE.ai = keepAi;
-    });
+    undoableAction('Board cleared. Your account is untouched', () => { STATE = blankState(); });
   });
 }
 
 'use strict';
-/* ================= Tack — services: config, notices, Google AI, Supabase sync ================= */
+/* ================= Dayu: config, notices, Supabase sync ================= */
 
 /* ---------- config (kept in this browser only, never synced) ---------- */
 const CFG_KEY = 'dayu-cfg-v1';
@@ -1001,18 +991,13 @@ const SB_DEFAULTS = {
   url: 'https://pzpaogsadtjmefiuhauy.supabase.co',
   anon: 'sb_publishable_Uvg27Wf778Lk0aGWUOXIiA_dLHrQvOt',
 };
-let CFG = { gemKey: '', gemModel: 'gemini-flash-latest', sbUrl: '', sbAnon: '', sbEmail: '', sbRefresh: '', lastUserId: '', lastSyncAt: 0 };
+let CFG = { sbUrl: '', sbAnon: '', sbEmail: '', sbRefresh: '', lastUserId: '', lastSyncAt: 0 };
 (function loadCfg() {
   try { const raw = storeGet(CFG_KEY) || storeGet('tack-cfg-v1'); if (raw) Object.assign(CFG, JSON.parse(raw)); } catch (e) { /* fresh */ }
   if (!CFG.sbUrl && SB_DEFAULTS.url) CFG.sbUrl = SB_DEFAULTS.url;
   if (!CFG.sbAnon && SB_DEFAULTS.anon) CFG.sbAnon = SB_DEFAULTS.anon;
-  if (/^gemini-2\./.test(CFG.gemModel || '')) CFG.gemModel = 'gemini-flash-latest'; // retired for new accounts
 })();
 function saveCfg() { storeSet(CFG_KEY, JSON.stringify(CFG)); }
-// The AI key and model live in the synced state, so they follow the account to every device.
-const AI_FALLBACK = { key: '', model: 'gemini-flash-latest', lastVersion: '' };
-function aiCfg() { return (STATE && STATE.ai) ? STATE.ai : AI_FALLBACK; }
-function aiConfigured() { return !!aiCfg().key; }
 
 /* ---------- notice bar (persistent in-app notifications) ---------- */
 function showNotice(id, msg) {
@@ -1026,83 +1011,6 @@ function showNotice(id, msg) {
   bar.append(n);
 }
 function clearNotice(id) { const n = $('.notice[data-id="' + id + '"]'); if (n) n.remove(); }
-
-/* ---------- Google AI (Gemini via AI Studio key) ---------- */
-const GEM_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
-async function gemini(prompt) {
-  const ai = aiCfg();
-  if (!ai.key) throw { code: 'nokey' };
-  const model = ai.model || 'gemini-flash-latest';
-  const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 4096 } };
-  let r;
-  try {
-    r = await fetch(GEM_BASE + encodeURIComponent(model) + ':generateContent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': ai.key },
-      body: JSON.stringify(body),
-    });
-  } catch (e) { throw { code: 'net' }; }
-  if (r.status === 429) {
-    showNotice('gem-quota', 'Google AI usage limit reached. Free-tier limits reset roughly once a day; try again later, or switch to Flash-Lite in Settings for higher limits.');
-    toast('Google AI limit hit');
-    throw { code: 'quota' };
-  }
-  if (r.status === 400 || r.status === 401 || r.status === 403) {
-    let msg = '';
-    try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* ignore */ }
-    if (/api key/i.test(msg) || r.status === 401 || r.status === 403) {
-      showNotice('gem-key', 'Google AI rejected the API key. Check it in Settings (⋯ menu).');
-      throw { code: 'key' };
-    }
-    throw { code: 'bad', msg };
-  }
-  if (r.status === 503) throw { code: 'busy' };
-  if (r.status === 404) {
-    let msg = '';
-    try { msg = ((await r.json()).error || {}).message || ''; } catch (e) { /* ignore */ }
-    showNotice('gem-model', 'That model is not available to this key: ' + (msg || model) + ' Pick another one in Settings.');
-    throw { code: 'model' };
-  }
-  if (!r.ok) throw { code: 'http' + r.status };
-  const j = await r.json();
-  let text = '';
-  try { text = j.candidates[0].content.parts.map(p => p.text || '').join(''); } catch (e) { /* empty */ }
-  if (!text.trim()) throw { code: 'empty' };
-  // Record which concrete version answered, since the -latest aliases move over time.
-  // Re-read the config: a sync pull may have replaced STATE while this request was in flight.
-  const cur = aiCfg();
-  if (j.modelVersion && j.modelVersion !== cur.lastVersion) { cur.lastVersion = j.modelVersion; save(); }
-  clearNotice('gem-key'); clearNotice('gem-quota'); clearNotice('gem-model');
-  return text.trim();
-}
-function modelLabel() {
-  const ai = aiCfg();
-  const sel = ai.model || 'gemini-flash-latest';
-  return ai.lastVersion && /latest/.test(sel) ? sel + ' (' + ai.lastVersion + ')' : (ai.lastVersion || sel);
-}
-function aiFailNote(err) {
-  const c = err && err.code;
-  if (c === 'quota') return 'Google AI limit reached, so this is the locally computed fallback.';
-  if (c === 'key') return 'Google AI key was rejected (see Settings), so this is the locally computed fallback.';
-  if (c === 'busy') return 'Google AI is overloaded right now, so this is the locally computed fallback.';
-  if (c === 'model') return 'That model is not available to your key, so this is the locally computed fallback. Pick another in Settings.';
-  if (c === 'nokey') return 'No AI key saved yet, so this is the locally computed fallback.';
-  if (c === 'net') return storageOK
-    ? 'Couldn’t reach Google AI (offline?), so this is the locally computed fallback.'
-    : 'This preview page can’t reach the internet. AI works when Dayu runs locally or on its own hosting.';
-  return 'AI error (' + (c || '?') + '), so this is the locally computed fallback.';
-}
-// shared: run a prompt preset over a data object, with local fallback
-async function summarize(p, data, sampleFn) {
-  if (aiConfigured()) {
-    try {
-      const out = await gemini((p ? p.text : 'Summarize this.') + '\n\nDATA (JSON):\n' + JSON.stringify(data)
-        + '\n\nReply in plain text under 200 words. No markdown formatting, no headers. Never use em dashes.');
-      return out + '\n\nWritten by ' + modelLabel();
-    } catch (err) { return sampleFn() + '\n\n' + aiFailNote(err); }
-  }
-  return sampleFn() + '\n\nSample summary, computed locally. Add your Google AI Studio key in Settings (⋯ menu) to use your saved prompts for real.';
-}
 
 /* ---------- Supabase (plain REST, no library) ---------- */
 const SB = { access: null, lastPull: 0, status: 'local', detail: '', pushTimer: null };
@@ -1331,7 +1239,7 @@ async function syncNow() {
     // Never swap the board out from under an open sheet: the user may be mid-edit in it.
     const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging;
     if (remote && remoteTs > localTs + 500 && !busy) {
-      STATE = migrate(remote.data, false);
+      STATE = migrate(remote.data);
       STATE.meta.updatedAt = remoteTs;
       storeSet(STORE_KEY, JSON.stringify(STATE));
       renderAll();
@@ -1433,49 +1341,8 @@ function openSettings() {
   root.innerHTML = ''; root.classList.add('open');
   const body = h('div.sbody');
 
-  body.append(h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '2px' } }, 'AI & sync'),
-    h('div', { style: { color: 'var(--ink2)', marginBottom: '18px', fontSize: '13px' } }, 'Your AI key is saved to your account, so it follows you to every device. The sync connection details stay in this browser.'));
-
-  // --- Google AI ---
-  const ai = aiCfg();
-  const ALIASES = [
-    ['gemini-flash-latest', 'Gemini Flash, latest (default)'],
-    ['gemini-flash-lite-latest', 'Gemini Flash-Lite, latest (higher free limits)'],
-  ];
-  const keyIn = h('input.input.grow', { type: 'password', placeholder: 'Paste your AI Studio API key', value: ai.key, autocomplete: 'off' });
-  keyIn.addEventListener('input', () => {
-    aiCfg().key = keyIn.value.trim();
-    clearNotice('gem-key'); clearNotice('gem-quota'); // a new key invalidates the old complaint
-    save();
-  });
-  const modelSel = h('select.input.grow', {}, ALIASES.map(([v, l]) => h('option', { value: v, selected: ai.model === v }, l)));
-  // A model picked before this build, or mid-sync from another device, might not be one
-  // of the two above; keep it selectable rather than silently switching it out from under them.
-  if (ai.model && !ALIASES.some(([v]) => v === ai.model)) modelSel.append(h('option', { value: ai.model, selected: true }, ai.model));
-  modelSel.addEventListener('change', () => {
-    aiCfg().model = modelSel.value;
-    aiCfg().lastVersion = '';
-    clearNotice('gem-model'); // the complaint was about the model they just replaced
-    save();
-  });
-
-  const aiStatus = h('span', { style: { fontSize: '12.5px', fontWeight: '700' } });
-  const testBtn = h('button.btn.small', { onclick: async () => {
-    testBtn.disabled = true; aiStatus.textContent = 'Testing…'; aiStatus.className = '';
-    try {
-      await gemini('Reply with exactly one word: ready');
-      aiStatus.textContent = '✓ Working';
-      aiStatus.className = 'okline';
-    } catch (err) {
-      aiStatus.textContent = '✕ ' + aiFailNote(err).replace(', so this is the locally computed fallback.', '').replace(', so this is the locally computed fallback', '');
-      aiStatus.className = 'errline';
-    }
-    testBtn.disabled = false;
-  } }, 'Test');
-  body.append(h('div.setsec', {},
-    h('span.label', {}, 'Google AI'),
-    h('div.frow', {}, keyIn),
-    h('div.frow', {}, modelSel, testBtn, aiStatus)));
+  body.append(h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '2px' } }, 'Account'),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '18px', fontSize: '13px' } }, 'Sign in and your board follows you to every device.'));
 
   // --- Supabase ---
   const sec = h('div.setsec', {}, h('span.label', {}, 'Account & sync'));
@@ -1555,6 +1422,8 @@ function buildZone(z) {
     e.preventDefault(); e.stopPropagation();
     startZoneDrag(z, e, head);
   });
+  // resize
+  onRightClickDelete(head, (cat ? cat.name : 'this') + ' cluster area', () => removeZone(z.id));
   // resize
   const rz = $('.zresize', el);
   rz.addEventListener('pointerdown', e => {
@@ -1718,6 +1587,9 @@ function buildNote(n) {
     el.addEventListener('pointermove', mv);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
+  });
+  onRightClickDelete(el, n.title || 'this note', () => {
+    undoableAction('Note deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
   });
   return el;
 }
@@ -2117,11 +1989,9 @@ function openNote(id) {
 
   // steps
   const stepsBox = h('div.steps');
-  const aiBtn = h('button.btn.ghost.small', { onclick: () => draftSteps(n, aiBtn, stepsBox, aiNote) }, '✨ Draft steps');
-  const aiNote = h('div.ainote');
   body.append(h('div.sec', {},
-    h('div.sechead', {}, h('span.label', {}, 'Steps'), aiBtn),
-    stepsBox, aiNote));
+    h('div.sechead', {}, h('span.label', {}, 'Steps')),
+    stepsBox));
   renderSteps(n, stepsBox);
 
   // category picker
@@ -2192,41 +2062,6 @@ function renderCatPick(n, pick, sheet) {
   pick.append(newBtn);
 }
 
-/* ---------- AI: draft steps (Google AI when configured, sample fallback) ---------- */
-function sampleSteps(title) {
-  const t = (title || 'this task').replace(/\s+/g, ' ').trim();
-  const short = t.length > 46 ? t.slice(0, 44) + '…' : t;
-  return [
-    'Write one sentence: what does “' + short + '” look like when it’s done?',
-    'Gather what you need first: links, files, tools, people.',
-    'Do the smallest first piece to get moving (10 to 15 min).',
-    'Push through a rough, ugly-but-complete pass.',
-    'Tidy up, check against your first sentence, then check it off.',
-  ];
-}
-async function draftSteps(n, btn, stepsBox, aiNote) {
-  btn.disabled = true; btn.textContent = 'Drafting…'; aiNote.textContent = '';
-  let lines = null, note = '';
-  if (aiConfigured()) {
-    try {
-      const cat = catById(n.catId);
-      const txt = await gemini('Break this to-do into 3 to 6 brief, direct steps.\nTask: ' + (n.title || 'Untitled')
-        + (n.desc ? '\nNotes: ' + n.desc : '') + (cat ? '\nCategory: ' + cat.name : '')
-        + '\nReply with one step per line. No numbering, no bullets, no intro line, no closing line, no em dashes.');
-      lines = txt.split('\n').map(s => s.replace(/^[\s\-\*•\d.)]+/, '').trim()).filter(s => s.length > 2).slice(0, 8);
-      if (!lines.length) { lines = null; note = 'The AI reply came back empty, used sample steps instead.'; }
-    } catch (err) {
-      note = aiFailNote(err).replace('this is the locally computed fallback', 'these are sample steps');
-    }
-  } else {
-    note = 'Sample steps. Add your Google AI Studio key in Settings (⋯ menu) for tailored ones.';
-  }
-  if (!lines) lines = sampleSteps(n.title);
-  for (const text of lines) n.steps.push({ id: uid(), text, done: false });
-  save(); renderSteps(n, stepsBox);
-  btn.disabled = false; btn.textContent = '✨ Draft steps';
-  aiNote.textContent = note;
-}
 
 'use strict';
 /* ================= Tack — daily goals (sheet) & dashboard ================= */
@@ -2360,6 +2195,9 @@ function renderHabitSheet() {
       } }, '✕'));
     nameTd.append(nameSpan, tools);
     const tr = h('tr', {}, nameTd);
+    onRightClickDelete(nameTd, hb.name, () => {
+      undoableAction('“' + hb.name + '” deleted', () => { STATE.habits = STATE.habits.filter(x => x.id !== hb.id); });
+    });
     for (const k of keys) {
       const cellTitle = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '');
       const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: cellTitle() });
@@ -2589,8 +2427,6 @@ function renderDashboard() {
     inner.append(tg);
   }
 
-  // AI summary
-  inner.append(buildDashSummarySection());
 }
 
 function habCard(hb, retired) {
@@ -2613,55 +2449,6 @@ function habCard(hb, retired) {
   return card;
 }
 
-/* ---------- dashboard AI summary ---------- */
-function dashData() {
-  return {
-    today: todayKey(),
-    dailyGoals: STATE.habits.map(hb => {
-      const s = habitStats(hb);
-      return {
-        name: hb.name, retired: !!hb.archivedAt, since: dayKey(s.since),
-        daysTracked: s.totalDays, daysHit: s.checked, hitRatePct: s.pct,
-        currentStreak: s.cur, bestStreak: s.best,
-        // last 14 days, one letter per day: G green (done), Y yellow, R red, . blank
-        last14: lastNDaysKeys(14).map(k => ({ green: 'G', yellow: 'Y', red: 'R' }[hb.days[k]] || '.')).join(''),
-      };
-    }),
-    taskGoals: STATE.goals.map(g => ({ name: g.name, target: g.target, period: g.period, progress: goalCount(g) })),
-  };
-}
-function sampleDashSummary() {
-  const habs = activeHabits();
-  if (!habs.length) return 'No daily goals tracked yet, so there is nothing to score. Add a few on the Goals page.';
-  const last7 = lastNDaysKeys(7);
-  const lines = [];
-  const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k] === 'green').length, 0);
-  lines.push('Last 7 days: you hit ' + hit7 + ' of ' + habs.length * 7 + ' possible checks (' + Math.round(hit7 / (habs.length * 7) * 100) + '%).');
-  const scored = habs.map(hb => ({ hb, s: habitStats(hb) })).sort((a, b) => b.s.pct - a.s.pct);
-  const top = scored[0], low = scored[scored.length - 1];
-  lines.push('Strongest: “' + top.hb.name + '” at ' + top.s.pct + '% (streak ' + top.s.cur + ', best ' + top.s.best + ').');
-  if (low !== top) lines.push('Weakest: “' + low.hb.name + '” at ' + low.s.pct + '%. Try anchoring it to something you already do every day.');
-  const curMax = scored.slice().sort((a, b) => b.s.cur - a.s.cur)[0];
-  if (curMax.s.cur >= 2) lines.push('Live streak: ' + curMax.s.cur + ' days of “' + curMax.hb.name + '”. Don’t break the chain today.');
-  return lines.join('\n');
-}
-function buildDashSummarySection() {
-  const prompts = STATE.prompts.filter(p => p.scope === 'dashboard');
-  const sel = h('select.input.grow', {}, prompts.map(p => h('option', { value: p.id }, p.name)));
-  const out = h('div.aiout');
-  const run = h('button.btn.primary.small', { onclick: async () => {
-    const p = STATE.prompts.find(x => x.id === sel.value);
-    out.classList.add('show'); out.textContent = 'Summarizing…'; run.disabled = true;
-    out.textContent = await summarize(p, dashData(), sampleDashSummary);
-    run.disabled = false;
-  } }, 'Summarize');
-  return h('div.aisec.dsec', {},
-    h('div.sechead', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
-      h('span.label', {}, 'AI review of your goal keeping'),
-      h('button.btn.ghost.small', { onclick: () => openPromptsModal('dashboard') }, 'Manage prompts')),
-    h('div.frow', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap' } }, sel, run),
-    out);
-}
 
 'use strict';
 /* ================= Tack — archive & goals pages, boot ================= */
@@ -2751,9 +2538,6 @@ function renderArchive() {
     for (const n of items) listEl.append(archiveCard(n));
   }
   refresh();
-
-  // --- summarize ---
-  inner.append(buildSummarySection());
 }
 
 function archiveCard(n) {
@@ -2776,108 +2560,11 @@ function archiveCard(n) {
         undoableAction('Deleted from archive', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
         completionChanged();
       } }, 'Delete')));
+  onRightClickDelete(card, n.title || 'this task', () => {
+    undoableAction('Deleted from archive', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
+    completionChanged();
+  });
   return card;
-}
-
-/* ---------- summaries (prompt presets, Google AI with local fallback) ---------- */
-function archiveDataFor(items) {
-  return items.map(n => ({
-    title: n.title, category: (catById(n.catId) || {}).name || null,
-    created: dayKey(n.createdAt), completed: dayKey(n.completedAt),
-    steps: n.steps.length, stepsDone: n.steps.filter(s => s.done).length,
-  }));
-}
-function buildSummarySection() {
-  const prompts = STATE.prompts.filter(p => p.scope !== 'dashboard');
-  const sel = h('select.input.grow', {}, prompts.map(p => h('option', { value: p.id }, p.name)));
-  const out = h('div.aiout');
-  const run = h('button.btn.primary.small', { onclick: async () => {
-    const items = archivedNotes();
-    const p = STATE.prompts.find(x => x.id === sel.value);
-    out.classList.add('show'); out.textContent = 'Summarizing…'; run.disabled = true;
-    out.textContent = await summarize(p, archiveDataFor(items), () => sampleSummary(items, p));
-    run.disabled = false;
-  } }, 'Summarize');
-  return h('div.aisec', {},
-    h('div.sechead', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' } },
-      h('span.label', {}, 'AI summary of the tasks above'),
-      h('button.btn.ghost.small', { onclick: () => openPromptsModal('archive') }, 'Manage prompts')),
-    h('div.frow', {}, sel, run),
-    out);
-}
-function sampleSummary(items, prompt) {
-  if (!items.length) return 'No tasks match the current filters — nothing to summarize.';
-  const byCat = {};
-  for (const n of items) {
-    const c = catById(n.catId);
-    const k = c ? c.name : 'No category';
-    byCat[k] = (byCat[k] || 0) + 1;
-  }
-  const catLines = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([k, v]) => '  • ' + k + ': ' + v).join('\n');
-  const span = fmtDY(items[items.length - 1].completedAt) + ' to ' + fmtDY(items[0].completedAt);
-  const byDay = {};
-  for (const n of items) { const k = dayKey(n.completedAt); byDay[k] = (byDay[k] || 0) + 1; }
-  const best = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0];
-  const avgDays = items.reduce((a, n) => a + (n.completedAt - n.createdAt), 0) / items.length / DAY;
-  return 'Using prompt: “' + (prompt ? prompt.name : '—') + '”\n\n'
-    + 'You completed ' + items.length + ' task' + (items.length === 1 ? '' : 's') + ' (' + span + ').\n\n'
-    + 'By category:\n' + catLines + '\n\n'
-    + 'Busiest day: ' + fmtDY(new Date(best[0] + 'T12:00').getTime()) + ' (' + best[1] + ' done)\n'
-    + 'Average time from created to done: ' + (avgDays < 1 ? 'same day' : avgDays.toFixed(1) + ' days');
-}
-
-function openPromptsModal(scope) {
-  scope = scope || 'archive';
-  const root = $('#modalRoot');
-  root.innerHTML = ''; root.classList.add('open');
-  const listEl = h('div.plist');
-  const body = h('div.sbody', {},
-    h('h1', { style: { fontSize: '20px', fontWeight: '800', marginBottom: '4px' } }, 'Summary prompts'),
-    h('div.sub', { style: { color: 'var(--ink2)', marginBottom: '14px' } },
-      scope === 'dashboard' ? 'Pre-written instructions the AI uses when reviewing your goal keeping.' : 'Pre-written instructions the AI uses when summarizing your archive.'),
-    listEl);
-  function refresh() {
-    listEl.innerHTML = '';
-    for (const p of STATE.prompts.filter(x => (x.scope || 'archive') === scope)) listEl.append(promptItem(p, refresh, scope));
-    listEl.append(h('button.btn.small', { style: { alignSelf: 'flex-start' }, onclick: () => {
-      STATE.prompts.push({ id: uid(), scope, name: 'New prompt', text: '' });
-      save(); refresh();
-      const items = $$('.pitem', listEl);
-      const last = items[items.length - 1];
-      const editBtn = $('.btn.ghost.small', last);
-      if (editBtn) editBtn.click();
-    } }, '＋ Add prompt'));
-  }
-  refresh();
-  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
-    h('div.sfoot', {}, h('span'), h('button.btn.small', { onclick: closeModal }, 'Done')));
-  root.append(h('div.overlay', { onclick: closeModal }), sheet);
-}
-function promptItem(p, refresh, scope) {
-  const item = h('div.pitem');
-  const head = h('div.phead', {},
-    h('span.pname', {}, p.name),
-    h('button.btn.ghost.small', { onclick: startEdit }, 'Edit'),
-    h('button.xbtn', { title: 'Delete prompt', onclick: () => {
-      undoableAction('Prompt deleted', () => { STATE.prompts = STATE.prompts.filter(x => x.id !== p.id); });
-      openPromptsModal(scope);
-    } }, '✕'));
-  item.append(head, h('div.ptext', {}, p.text || 'No instructions yet.'));
-  function startEdit() {
-    item.innerHTML = '';
-    const nameIn = h('input.input', { value: p.name, maxLength: 60 });
-    const textIn = h('textarea.input', { value: p.text, placeholder: 'What should the AI do with the filtered tasks?' });
-    item.append(h('div.pedit', {}, nameIn, textIn,
-      h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
-        h('button.btn.ghost.small', { onclick: refresh }, 'Cancel'),
-        h('button.btn.primary.small', { onclick: () => {
-          p.name = nameIn.value.trim() || 'Untitled prompt';
-          p.text = textIn.value.trim();
-          save(); refresh();
-        } }, 'Save'))));
-    nameIn.focus(); nameIn.select();
-  }
-  return item;
 }
 
 /* ---------- goals & wishlist ---------- */
@@ -2899,7 +2586,7 @@ function renderGoals() {
   for (const g of STATE.goals) {
     const nDone = goalCount(g), met = nDone >= g.target, pct = clamp(nDone / g.target * 100, 0, 100);
     const cat = catById(g.catId);
-    goalsCol.append(h('div.gcard' + (met ? '.donegoal' : ''), {},
+    const gcard = h('div.gcard' + (met ? '.donegoal' : ''), {},
       h('div.ghead', {},
         h('span.gname', {}, g.name),
         met ? h('span.gdone-tag', {}, '✓ reached') : null,
@@ -2908,7 +2595,9 @@ function renderGoals() {
       h('div.gmeta', {}, 'Finish ' + g.target + ' task' + (g.target === 1 ? '' : 's') + ' ' + PERIOD_LABEL[g.period] + (cat ? ' in “' + cat.name + '”' : '')),
       h('div.gbar', {},
         h('div.gtrack', {}, h('div.gfill' + (met ? '.full' : ''), { style: { width: pct + '%' } })),
-        h('span.gnum', {}, nDone + ' / ' + g.target))));
+        h('span.gnum', {}, nDone + ' / ' + g.target)));
+    onRightClickDelete(gcard, g.name, () => undoableAction('Goal deleted', () => { STATE.goals = STATE.goals.filter(x => x.id !== g.id); }));
+    goalsCol.append(gcard);
   }
   // new goal form
   const gName = h('input.input.grow', { placeholder: 'Goal name (e.g. Clear the inbox pile)', maxLength: 60 });
@@ -2930,7 +2619,7 @@ function renderGoals() {
   if (!STATE.wishes.length) wishCol.append(h('div.empty', {}, 'Nothing on the wishlist yet.'));
   for (const w of STATE.wishes) wishCol.append(wishCard(w));
 
-  const wText = h('input.input.grow', { placeholder: 'Treat yourself to… (e.g. that overpriced sandwich)', maxLength: 80 });
+  const wText = h('input.input.grow', { placeholder: 'Working towards…', maxLength: 80 });
   const wUrl = h('input.input.grow', { placeholder: 'Paste a shop link (optional). Amazon links pull in a picture', maxLength: 600 });
   const wGoal = h('select.input', {}, h('option', { value: '' }, 'no goal, just a wish'), STATE.goals.map(g => h('option', { value: g.id }, 'unlocks with: ' + g.name)));
   const addWish = () => {
@@ -2990,16 +2679,20 @@ function wishCard(w) {
       confetti(r.left, r.top);
       renderGoals();
     } }, 'Claim it') : null,
-    h('button.lnkbtn', { title: 'Edit link and picture', onclick: () => openWishLinkEditor(w) }, '🔗'),
+    h('button.lnkbtn', { title: 'Edit name, link and picture', onclick: () => openWishLinkEditor(w) }, '✎'),
     h('button.xbtn', { title: 'Delete', onclick: () => undoableAction('Wish deleted', () => { STATE.wishes = STATE.wishes.filter(x => x.id !== w.id); }) }, '✕')));
   if (stateEl) main.append(h('div.gmeta', {}, stateEl));
+  onRightClickDelete(card, w.text || 'this wish', () => {
+    undoableAction('Wish deleted', () => { STATE.wishes = STATE.wishes.filter(x => x.id !== w.id); });
+  });
   return card;
 }
 
-// Attach or change the shop link and picture for an existing wish.
+// Rename a wish, or attach and change its shop link and picture.
 function openWishLinkEditor(w) {
   const root = $('#modalRoot');
   root.innerHTML = ''; root.classList.add('open');
+  const nameIn = h('input.input.grow', { placeholder: 'Working towards…', value: w.text || '', maxLength: 80 });
   const urlIn = h('input.input.grow', { placeholder: 'https://www.amazon.com/dp/…', value: w.url || '', maxLength: 600 });
   const imgIn = h('input.input.grow', { placeholder: 'Picture link (optional, overrides the automatic one)', value: w.img || '', maxLength: 600 });
   const preview = h('div.wprev');
@@ -3036,23 +2729,31 @@ function openWishLinkEditor(w) {
   imgIn.addEventListener('input', paint);
   paint();
 
+  const commit = () => {
+    if (!nameIn.value.trim()) { note.textContent = 'Give it a name so you know what you are working towards.'; nameIn.focus(); return; }
+    // Refuse to close on something we would only throw away: say so and let them fix it.
+    if (urlIn.value.trim() && !normalizeUrl(urlIn.value)) { note.textContent = 'That shop link is not a web address Dayu can open. Fix it, or clear the box.'; urlIn.focus(); return; }
+    if (imgIn.value.trim() && !normalizeUrl(imgIn.value)) { note.textContent = 'That picture link is not a web address Dayu can open. Fix it, or clear the box.'; imgIn.focus(); return; }
+    w.text = nameIn.value.trim();
+    w.url = normalizeUrl(urlIn.value); w.img = normalizeUrl(imgIn.value);
+    save(); closeModal(); renderGoals();
+  };
+  nameIn.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
+  urlIn.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
+  imgIn.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); });
+
   const body = h('div.sbody', {},
-    h('h1', { style: { fontSize: '19px', fontWeight: '800', marginBottom: '2px' } }, w.text),
-    h('div', { style: { color: 'var(--ink2)', marginBottom: '16px', fontSize: '13px' } }, 'Link this to where you would buy it.'),
+    h('h1', { style: { fontSize: '19px', fontWeight: '800', marginBottom: '2px' } }, 'Edit wish'),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '16px', fontSize: '13px' } }, 'Rename it, and link it to where you would buy it.'),
+    h('div.setsec', {}, h('span.label', {}, 'Name'), h('div.frow', { style: { display: 'flex', marginTop: '8px' } }, nameIn)),
     h('div.setsec', {}, h('span.label', {}, 'Shop link'), h('div.frow', { style: { display: 'flex', marginTop: '8px' } }, urlIn)),
     h('div.setsec', {}, h('span.label', {}, 'Picture'), h('div.frow', { style: { display: 'flex', marginTop: '8px' } }, imgIn), preview, note));
   const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
     h('div.sfoot', {},
       h('button.btn.danger.small', { onclick: () => { w.url = ''; w.img = ''; save(); closeModal(); renderGoals(); } }, 'Remove link'),
-      h('button.btn.primary.small', { onclick: () => {
-        // Refuse to close on something we would only throw away: say so and let them fix it.
-        if (urlIn.value.trim() && !normalizeUrl(urlIn.value)) { note.textContent = 'That shop link is not a web address Dayu can open. Fix it, or clear the box.'; urlIn.focus(); return; }
-        if (imgIn.value.trim() && !normalizeUrl(imgIn.value)) { note.textContent = 'That picture link is not a web address Dayu can open. Fix it, or clear the box.'; imgIn.focus(); return; }
-        w.url = normalizeUrl(urlIn.value); w.img = normalizeUrl(imgIn.value);
-        save(); closeModal(); renderGoals();
-      } }, 'Save')));
+      h('button.btn.primary.small', { onclick: commit }, 'Save')));
   root.append(h('div.overlay', { onclick: closeModal }), sheet);
-  setTimeout(() => urlIn.focus(), 0);
+  setTimeout(() => { nameIn.focus(); nameIn.select(); }, 0);
 }
 
 /* ---------- boot ---------- */
