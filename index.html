@@ -111,6 +111,7 @@ main{flex:1;min-height:0;position:relative}
 #board.panready{cursor:grab}
 #board.panning{cursor:grabbing;user-select:none}
 #board.drawing{cursor:crosshair}
+#board.placing{cursor:crosshair} /* armed for a new note: the next click picks its spot */
 #field{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
 .hint{
   position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);
@@ -162,6 +163,9 @@ main{flex:1;min-height:0;position:relative}
 .note .ntitle:empty::before{content:"Untitled";opacity:.4}
 .note .nmeta{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10.5px;font-weight:700;color:var(--note-ink2)}
 .note .nmeta:empty{display:none}
+/* three dots: there is a description written inside this one */
+.note .nmore{display:flex;gap:3px;margin-top:6px}
+.note .nmore span{width:3.5px;height:3.5px;border-radius:50%;background:var(--note-ink2)}
 .note .ncat{letter-spacing:.05em;text-transform:uppercase;font-size:9.5px}
 .note .nsteps{font-variant-numeric:tabular-nums}
 .note.done{opacity:.55}
@@ -247,10 +251,36 @@ main{flex:1;min-height:0;position:relative}
   flex:1;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
   font-size:21px;font-weight:800;letter-spacing:-.01em;line-height:1.25;
 }
+/* description: rendered Markdown, swapping to its plain source while you edit */
+.sheet .descwrap{margin:6px 0 0 38px;max-width:calc(100% - 38px)}
 .sheet .desc{
   width:100%;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
-  color:var(--ink2);font-size:13.5px;margin:6px 0 0 38px;max-width:calc(100% - 38px);
+  color:var(--ink2);font-size:13.5px;font-family:inherit;
 }
+.descadd{color:var(--ink3);font-size:13px;padding:2px 0;text-align:left}
+.descadd:hover{color:var(--accent)}
+.mdbody{
+  color:var(--ink2);font-size:13.5px;line-height:1.55;cursor:text;
+  border-radius:8px;padding:3px 5px;margin:0 -5px;overflow-wrap:anywhere;
+}
+.mdbody:hover{background:var(--accent-soft)}
+.mdbody>*:first-child{margin-top:0}
+.mdbody>*:last-child{margin-bottom:0}
+.mdbody p{margin:0 0 8px}
+.mdbody h3{font-size:15px;font-weight:800;color:var(--ink);margin:13px 0 5px}
+.mdbody h4{font-size:13.5px;font-weight:800;color:var(--ink);margin:11px 0 4px}
+.mdbody h5,.mdbody h6{font-size:12px;font-weight:800;color:var(--ink2);margin:11px 0 4px;letter-spacing:.05em;text-transform:uppercase}
+.mdbody ul,.mdbody ol{margin:0 0 8px;padding-left:20px}
+.mdbody li{margin:2px 0}
+.mdbody a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.mdbody strong{color:var(--ink);font-weight:800}
+.mdbody code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px;background:var(--raise);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.mdbody pre{background:var(--raise);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin:0 0 8px;overflow-x:auto}
+.mdbody pre code{background:none;border:none;padding:0}
+.mdbody blockquote{margin:0 0 8px;padding:2px 0 2px 12px;border-left:3px solid var(--line2);color:var(--ink3)}
+.mdbody hr{border:none;border-top:1px solid var(--line);margin:13px 0}
+.mdbody .mdbox{display:inline-block;width:11px;height:11px;border:1.5px solid var(--line2);border-radius:3px;margin-right:6px;vertical-align:-1px}
+.mdbody .mdbox.on{background:var(--good);border-color:var(--good)}
 .sheet .sec{margin-top:20px}
 .sheet .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .steps{display:flex;flex-direction:column;gap:2px}
@@ -390,6 +420,9 @@ a.wthumbwrap:hover{border-color:var(--accent)}
 
 /* ---------- toast / misc ---------- */
 #toastRoot{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
+/* The canvas keeps its toolbar at the bottom centre, which is exactly where messages land.
+   On that page they sit above it, so Undo never covers the buttons. */
+body.canvasview #toastRoot{bottom:78px}
 .toast{
   display:flex;align-items:center;gap:14px;padding:10px 16px;border-radius:12px;
   background:var(--ink);color:var(--paper);font-weight:600;font-size:13px;box-shadow:var(--shadow-big);
@@ -589,11 +622,11 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
         </div>
       </div>
       <div id="toolbar">
-        <button id="btnNote" class="primary" title="Add a note (or double-click the canvas)">
+        <button id="btnNote" class="primary" title="Pick the spot for a new task (or double-click the canvas)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          Note
+          <span id="btnNoteLabel">Task</span>
         </button>
-        <button id="btnZone" title="Draw a cluster area, then drop notes into it">
+        <button id="btnZone" title="Draw a cluster area, then drop tasks into it">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.5 3" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="3"/></svg>
           Cluster
         </button>
@@ -839,6 +872,89 @@ function wishImageUrl(w) {
   return safeUrl(w.img) || amazonImageFor(w.url) || '';
 }
 
+/* ---------- markdown (task descriptions) ---------- */
+// A deliberately small subset, rendered safely: every scrap of the source is escaped
+// first, so the only tags that can reach the page are the ones written here, and a link
+// address still has to survive safeUrl before it becomes an href.
+function mdEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+const MD_UL = /^\s*[-*+]\s+/, MD_OL = /^\s*\d+[.)]\s+/, MD_QUOTE = /^\s*>\s?/;
+function mdInline(s) {
+  // Code spans come out first: whatever is inside them is text, not markup.
+  const codes = [];
+  let t = String(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+  t = mdEsc(t);
+  t = t.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (m, text, url) => {
+    const safe = safeUrl(url.replace(/&amp;/g, '&'));
+    return safe ? '<a href="' + mdEsc(safe) + '" target="_blank" rel="noopener noreferrer">' + (text || mdEsc(safe)) + '</a>' : m;
+  });
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+  t = t.replace(/(^|[^*\w])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+  t = t.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+  return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + mdEsc(codes[Number(i)]) + '</code>');
+}
+function mdToHtml(src) {
+  const lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
+  let out = '', i = 0;
+  const para = [];
+  const flush = () => {
+    if (!para.length) return;
+    out += '<p>' + mdInline(para.join('\n')).replace(/\n/g, '<br>') + '</p>';
+    para.length = 0;
+  };
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```/.test(line)) {                                  // fenced code
+      flush();
+      const buf = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++;
+      out += '<pre><code>' + mdEsc(buf.join('\n')) + '</code></pre>';
+      continue;
+    }
+    if (/^\s*$/.test(line)) { flush(); i++; continue; }
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out += '<hr>'; i++; continue; }
+    const head = line.match(/^(#{1,4})\s+(.*)$/);
+    if (head) {
+      flush();
+      const tag = 'h' + (head[1].length + 2);                  // # is h3: the task title above is the h1 here
+      out += '<' + tag + '>' + mdInline(head[2]) + '</' + tag + '>';
+      i++; continue;
+    }
+    if (MD_QUOTE.test(line)) {
+      flush();
+      const buf = [];
+      while (i < lines.length && MD_QUOTE.test(lines[i])) { buf.push(lines[i].replace(MD_QUOTE, '')); i++; }
+      out += '<blockquote>' + mdToHtml(buf.join('\n')) + '</blockquote>';
+      continue;
+    }
+    const ul = MD_UL.test(line), ol = !ul && MD_OL.test(line);
+    if (ul || ol) {
+      flush();
+      const mark = ul ? MD_UL : MD_OL;
+      let items = '';
+      while (i < lines.length && mark.test(lines[i])) {
+        let text = lines[i].replace(mark, '');
+        const box = text.match(/^\[([ xX])\]\s+/);             // - [ ] and - [x], as written
+        let pre = '';
+        if (box) { pre = '<span class="mdbox' + (box[1] === ' ' ? '' : ' on') + '"></span>'; text = text.slice(box[0].length); }
+        items += '<li>' + pre + mdInline(text) + '</li>';
+        i++;
+      }
+      out += ul ? '<ul>' + items + '</ul>' : '<ol>' + items + '</ol>';
+      continue;
+    }
+    para.push(line);
+    i++;
+  }
+  flush();
+  return out;
+}
+
 /* ---------- right-click delete ---------- */
 // One popup, reused everywhere. It asks and deletes in the same breath: right-click,
 // then one click to confirm, with the usual Undo waiting in the toast afterwards.
@@ -963,11 +1079,18 @@ function renderMeters(pulse) {
 /* ---------- router (click-driven; the URL hash is a nice-to-have) ---------- */
 let pageName = 'canvas';
 function currentPage() { return pageName; }
+// Only the canvas carries a bottom toolbar, and toasts land in the same corner. Marking
+// the page on the body lets them sit above it there and stay low everywhere else. Called
+// at boot as well as on every move, since a sign-in toast can arrive before the first route.
+function syncPageChrome() { document.body.classList.toggle('canvasview', pageName === 'canvas'); }
 function go(pg) {
   pageName = ['canvas', 'archive', 'goals', 'dashboard'].includes(pg) ? pg : 'canvas';
   try { if (location.hash !== '#' + pageName) history.replaceState(null, '', '#' + pageName); } catch (e) { /* data:/sandboxed pages */ }
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'pg-' + pageName));
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === pageName));
+  syncPageChrome();
+  // An armed toolbar button should not still be waiting when you wander back later.
+  if (pageName !== 'canvas') { setDrawMode(false); setPlaceMode(false); }
   if (pageName === 'archive') renderArchive();
   if (pageName === 'goals') renderGoals();
   if (pageName === 'dashboard') renderDashboard();
@@ -1317,7 +1440,7 @@ async function syncNow() {
     await pushProgress(); // friends see the trimmed snapshot, never the board itself
   } catch (e) {
     syncStatus('off');
-    if (!storageOK) showNotice('sandbox', 'This preview page can’t reach the internet, so AI and sync are off here. They work when Tack runs locally or on your own hosting.');
+    if (!storageOK) showNotice('sandbox', 'This preview page can’t reach the internet, so sync and friends are off here. They work when Dayu runs locally or on your own hosting.');
   } finally {
     syncing = false;
   }
@@ -1707,6 +1830,7 @@ function openSettings() {
 /* ================= Tack — canvas, notes, zones, modal ================= */
 const NOTE_W = 178;
 let drawMode = false;
+let placeMode = false; // the Note button is armed and waiting for you to click a spot
 
 function catById(id) { return STATE.cats.find(c => c.id === id) || null; }
 function noteById(id) { return STATE.notes.find(n => n.id === id) || null; }
@@ -1729,8 +1853,8 @@ function renderCanvas() {
   if (!live.length && !STATE.zones.length) {
     board.append(h('div.hint', {},
       h('div', { style: { fontSize: '34px', marginBottom: '10px' } }, '📌'),
-      h('div', {}, h('b', {}, 'Double-click anywhere'), ' to pin your first note.'),
-      h('div', { style: { marginTop: '4px' } }, 'Then draw a cluster and drag notes into it.')));
+      h('div', {}, h('b', {}, 'Double-click anywhere'), ' to pin your first task.'),
+      h('div', { style: { marginTop: '4px' } }, 'Then draw a cluster and drag tasks into it.')));
   }
 }
 
@@ -1744,7 +1868,7 @@ function buildZone(z) {
       h('span.dot', { style: { width: '8px', height: '8px', borderRadius: '50%', background: pal.deep, flex: '0 0 auto' } }),
       h('span', {}, cat ? cat.name : '?'),
       h('span.zcount', {}, String(notesInCat(z.catId).length)),
-      h('button.zdel', { title: 'Remove this area (notes keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
+      h('button.zdel', { title: 'Remove this area (tasks keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
     h('div.zresize', { title: 'Resize' }));
 
   // move zone by its name tag (its empty interior works too, handled on the field)
@@ -1840,7 +1964,7 @@ function startZoneDrag(z, e, grabEl) {
   window.addEventListener('pointercancel', cancel);
 }
 function removeZone(id) {
-  undoableAction('Cluster area removed. Notes kept their category', () => {
+  undoableAction('Cluster area removed. Tasks kept their category', () => {
     STATE.zones = STATE.zones.filter(z => z.id !== id);
   });
 }
@@ -1883,6 +2007,11 @@ function buildNote(n) {
     setTimeout(() => { ta.focus(); ta.style.height = ta.scrollHeight + 'px'; }, 0);
   } else {
     el.append(h('div.ntitle', {}, n.title));
+    // Three dots say "there is more written inside" without spilling it onto the card.
+    if ((n.desc || '').trim()) {
+      el.append(h('div.nmore', { title: 'Has a description. Click to read it' },
+        h('span'), h('span'), h('span')));
+    }
     const meta = h('div.nmeta');
     const cat = catById(n.catId);
     if (cat) meta.append(h('span.ncat', { style: { color: palById(cat.color).deep } }, cat.name));
@@ -1920,8 +2049,8 @@ function buildNote(n) {
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', up);
   });
-  onRightClickDelete(el, n.title || 'this note', () => {
-    undoableAction('Note deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
+  onRightClickDelete(el, n.title || 'this task', () => {
+    undoableAction('Task deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); });
   });
   return el;
 }
@@ -1979,10 +2108,21 @@ function newNoteAt(x, y) {
   STATE.notes.push(n);
   save(); renderCanvas();
 }
-function newNoteCenter() {
-  const rb = $('#board').getBoundingClientRect();
-  const c = toCanvas(rb.left + rb.width / 2, rb.top + rb.height / 2);
-  newNoteAt(c.x - NOTE_W / 2 + (Math.random() * 60 - 30), c.y - 60 + (Math.random() * 60 - 30));
+// The Note button arms placement rather than dropping a note somewhere and leaving you to
+// move it. While armed, a click puts the note where you clicked; dragging still pans, so
+// you can look around first, and Escape or a second press of the button calls it off.
+function setPlaceMode(on) {
+  placeMode = on;
+  const btn = $('#btnNote');
+  if (btn) {
+    btn.classList.toggle('on', on);
+    btn.title = on ? 'Click the canvas to put the task there, or press Escape' : 'Pick the spot for a new task (or double-click the canvas)';
+    const lab = $('#btnNoteLabel');
+    if (lab) lab.textContent = on ? 'Click a spot' : 'Task';
+  }
+  const board = $('#board');
+  if (board) board.classList.toggle('placing', on);
+  if (on) setDrawMode(false); // the two modes both want the next click
 }
 
 /* ---------- complete / archive flow ---------- */
@@ -2113,10 +2253,11 @@ function setDrawMode(on) {
   drawMode = on;
   $('#btnZone').classList.toggle('on', on);
   $('#board').classList.toggle('drawing', on);
+  if (on) setPlaceMode(false); // the two modes both want the next click
 }
 function wireCanvas() {
   const board = $('#board'), field = $('#field');
-  $('#btnNote').addEventListener('click', newNoteCenter);
+  $('#btnNote').addEventListener('click', () => setPlaceMode(!placeMode));
   $('#btnZone').addEventListener('click', () => setDrawMode(!drawMode));
   $('#btnHome').addEventListener('click', recenter);
   loadView();
@@ -2149,7 +2290,10 @@ function wireCanvas() {
     if (e.button !== 0 && !panOverride) return;
     if (e.target.closest('.note, .zhead, .zresize, .zonepop')) return;
     commitOpenNoteEditor(); // finish any title being typed before taking over the gesture
-    if (!panOverride) {
+    // Armed for a new note: this gesture is either the placement click or a look-around
+    // pan, never a cluster drag, so a note can be dropped inside a cluster too.
+    const placing = placeMode && !panOverride && e.button === 0 && onBareCanvas(e.target);
+    if (!panOverride && !placing) {
       const c = toCanvas(e.clientX, e.clientY);
       const z = zoneAt(c.x, c.y);
       if (z) { startZoneDrag(z, e, board); return; }
@@ -2180,6 +2324,13 @@ function wireCanvas() {
       window.removeEventListener('pointercancel', up);
       board.classList.remove('panning');
       try { board.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      // A press that never became a drag is the click that picks the spot. A cancelled
+      // gesture is not a click, so it places nothing.
+      if (placing && placeMode && !panning && ev && ev.type === 'pointerup') {
+        const c = toCanvas(e.clientX, e.clientY);
+        setPlaceMode(false);
+        newNoteAt(c.x - NOTE_W / 2, c.y - 20);
+      }
     };
     board.addEventListener('pointermove', mv);
     board.addEventListener('pointerup', up);
@@ -2228,7 +2379,7 @@ function wireCanvas() {
     return false;
   };
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { setDrawMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
+    if (e.key === 'Escape') { setDrawMode(false); setPlaceMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove()); }
     if (e.code === 'Space' && spaceIsOurs(e.target)) {
       if (!spaceHeld) { spaceHeld = true; board.classList.add('panready'); }
       e.preventDefault(); // stop the page from scrolling under us
@@ -2245,23 +2396,18 @@ function zoneNamePopover(x, y, w, hgt) {
   const unused = PAL.filter(p => !STATE.cats.some(c => c.color === p.id));
   let color = (unused[0] || PAL[STATE.cats.length % PAL.length]).id;
   const nameIn = h('input.input', { placeholder: 'Name this cluster…', maxLength: 40 });
-  const existing = STATE.cats.filter(c => !STATE.zones.some(z => z.catId === c.id));
-  const sel = existing.length ? h('select.input', {},
-    h('option', { value: '' }, '…or use an existing category'),
-    existing.map(c => h('option', { value: c.id }, c.name))) : null;
   const dots = h('div.dots', {}, PAL.map(p => {
     const b = h('button.cdot' + (p.id === color ? '.on' : ''), { style: { background: p.bg }, title: p.name, onclick: () => { color = p.id; $$('.cdot', dots).forEach(d => d.classList.remove('on')); b.classList.add('on'); } });
     return b;
   }));
   const create = () => {
-    let catId = sel && sel.value ? sel.value : null;
     const nm = nameIn.value.trim();
-    if (!catId) {
-      if (!nm) { nameIn.focus(); return; }
-      const existingByName = STATE.cats.find(c => c.name.toLowerCase() === nm.toLowerCase());
-      if (existingByName) catId = existingByName.id;
-      else { const c = { id: uid(), name: nm, color }; STATE.cats.push(c); catId = c.id; }
-    }
+    if (!nm) { nameIn.focus(); return; }
+    // Typing a name that already exists joins that category rather than making a twin of it.
+    let catId;
+    const existingByName = STATE.cats.find(c => c.name.toLowerCase() === nm.toLowerCase());
+    if (existingByName) catId = existingByName.id;
+    else { const c = { id: uid(), name: nm, color }; STATE.cats.push(c); catId = c.id; }
     STATE.zones.push({ id: uid(), catId, x, y, w, h: hgt });
     // adopt notes already inside the new area
     for (const n of STATE.notes) {
@@ -2274,7 +2420,7 @@ function zoneNamePopover(x, y, w, hgt) {
   };
   const pop = h('div.zonepop', { style: { left: x + 'px', top: (y + hgt + 8) + 'px' } },
     h('div.label', {}, 'New cluster'),
-    nameIn, sel, dots,
+    nameIn, dots,
     h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
       h('button.btn.ghost.small', { onclick: () => pop.remove() }, 'Cancel'),
       h('button.btn.primary.small', { onclick: create }, 'Create')));
@@ -2317,9 +2463,33 @@ function openNote(id) {
   ttl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); ttl.blur(); } });
   body.append(h('div.srow', {}, bigchk, ttl));
 
-  const desc = h('textarea.desc', { rows: 1, placeholder: 'Add a note to self…', value: n.desc || '' });
-  desc.addEventListener('input', () => { n.desc = desc.value; grow(desc); save(); });
-  body.append(desc);
+  // The description is Markdown. It reads as formatted text and turns back into the plain
+  // source the moment you click into it, so what you edit is always exactly what you wrote.
+  const descWrap = h('div.descwrap');
+  body.append(descWrap);
+  const paintDesc = editing => {
+    descWrap.innerHTML = '';
+    if (editing) {
+      const ta = h('textarea.desc', { rows: 1, placeholder: 'Add a description. Markdown works: **bold**, # heading, - list', value: n.desc || '' });
+      ta.addEventListener('input', () => { n.desc = ta.value; grow(ta); save(); });
+      ta.addEventListener('blur', () => paintDesc(false));
+      ta.addEventListener('keydown', ev => { if (ev.key === 'Escape') ta.blur(); ev.stopPropagation(); });
+      descWrap.append(ta);
+      grow(ta);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      return;
+    }
+    if ((n.desc || '').trim()) {
+      const view = h('div.mdbody', { title: 'Click to edit' });
+      view.innerHTML = mdToHtml(n.desc);
+      view.addEventListener('click', ev => { if (!ev.target.closest('a')) paintDesc(true); });
+      descWrap.append(view);
+      return;
+    }
+    descWrap.append(h('button.descadd', { onclick: () => paintDesc(true) }, 'Add a description…'));
+  };
+  paintDesc(false);
 
   // steps
   const stepsBox = h('div.steps');
@@ -2340,12 +2510,12 @@ function openNote(id) {
 
   // footer
   sheet.append(h('div.sfoot', {},
-    h('button.btn.danger.small', { onclick: () => { closeModal(); undoableAction('Note deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); }); } }, 'Delete'),
+    h('button.btn.danger.small', { onclick: () => { closeModal(); undoableAction('Task deleted', () => { STATE.notes = STATE.notes.filter(x => x.id !== n.id); }); } }, 'Delete'),
     h('span.screated', { title: fmtFull(n.createdAt) }, 'Created ' + fmtDY(n.createdAt)),
     h('button.btn.small', { onclick: closeModal }, 'Close')));
 
   root.append(h('div.overlay', { onclick: closeModal }), sheet);
-  setTimeout(() => { grow(ttl); grow(desc); if (!n.title) ttl.focus(); }, 0);
+  setTimeout(() => { grow(ttl); if (!n.title) ttl.focus(); }, 0);
 }
 
 function renderSteps(n, box) {
@@ -3416,6 +3586,7 @@ function boot() {
   wireMenu();
   wireCanvas();
   wireTabs();
+  syncPageChrome();
   renderMeters(); renderCanvas();
   // parse any OAuth redirect BEFORE the router touches the URL hash
   handleAuthRedirect().then(() => {
