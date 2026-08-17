@@ -7,7 +7,7 @@
   --paper:#F5F2E9; --dots:#DAD4C2; --surface:#FFFFFF; --raise:#FBFAF5;
   --ink:#17161B; --ink2:#5D5B64; --ink3:#93909B; --line:#E4E0D2; --line2:#D2CDBB;
   --accent:#2B3FD6; --accent-hover:#1F2FA8; --accent-ink:#FFFFFF; --accent-soft:rgba(43,63,214,.09);
-  --good:#187A48; --warn:#B4790E; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08);
+  --good:#187A48; --warn:#B4790E; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08); --rest:#1C86D6;
   --shadow:0 1px 2px rgba(23,22,27,.07),0 8px 22px rgba(23,22,27,.11);
   --shadow-big:0 4px 10px rgba(23,22,27,.10),0 24px 60px rgba(23,22,27,.22);
   --note-ink:#262212; --note-ink2:rgba(38,34,18,.62);
@@ -17,7 +17,7 @@
     --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
     --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
     --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-    --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+    --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0;
     --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
     --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
   }
@@ -26,7 +26,7 @@
   --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
   --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
   --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-  --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10);
+  --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0;
   --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
   --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
 }
@@ -472,6 +472,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .hcell{width:36px;height:36px;padding:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center;transition:background .1s ease}
 .hcell:hover{background:var(--accent-soft)}
 .hcell.c-green{background:var(--good)}
+.hcell.c-blue{background:var(--rest)}
 .hcell.c-yellow{background:var(--warn)}
 .hcell.c-red{background:var(--danger)}
 .htable td.hname input{width:100%;border:none;outline:none;background:transparent;font:inherit}
@@ -511,6 +512,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .hab .strip{display:flex;gap:3px;margin-top:10px;flex-wrap:wrap}
 .sq{width:12px;height:12px;border-radius:3px;background:var(--line)}
 .sq.c-green{background:var(--good)}
+.sq.c-blue{background:var(--rest)}
 .sq.c-yellow{background:var(--warn)}
 .sq.c-red{background:var(--danger)}
 .sq.today{outline:2px solid var(--accent);outline-offset:1px}
@@ -2401,34 +2403,49 @@ function renderCatPick(n, pick, sheet) {
 function activeHabits() { return STATE.habits.filter(x => !x.archivedAt).sort((a, b) => (a.order || 0) - (b.order || 0)); }
 function retiredHabits() { return STATE.habits.filter(x => x.archivedAt).sort((a, b) => b.archivedAt - a.archivedAt); }
 function todayKey() { return dayKey(Date.now()); }
-// A cell cycles blank -> green -> yellow -> red -> blank. Green is the only state that
-// counts as "done" for streaks and hit rate; yellow/red just record that the day was marked.
-const CELL_ORDER = ['green', 'yellow', 'red'];
+// A cell cycles blank -> green -> blue -> yellow -> red -> blank. Green is the only state
+// that counts as "done". Blue is a planned rest day: it never counts as done, but unlike
+// yellow/red it also never counts against you, since skipping on purpose is not a miss.
+const CELL_ORDER = ['green', 'blue', 'yellow', 'red'];
 function habitCheckedToday(hb) { return hb.days[todayKey()] === 'green'; }
+function cellLabel(v) { return v === 'blue' ? 'rest day' : v; }
 function keyToTs(k) { return new Date(k + 'T12:00').getTime(); }
+// True when every day strictly between two green days was a planned rest, so a streak
+// treats the gap as bridged instead of broken. Adjacent days (no gap) trivially bridge.
+function restBridges(hb, fromTs, toTs) {
+  for (let t = fromTs + DAY; t < toTs; t += DAY) if (hb.days[dayKey(t)] !== 'blue') return false;
+  return true;
+}
 
 function habitStats(hb) {
   const keys = Object.keys(hb.days).sort();          // every marked day, any color
   const greenKeys = keys.filter(k => hb.days[k] === 'green');
+  const blueCount = keys.filter(k => hb.days[k] === 'blue').length;
   const end = startOfDay(hb.archivedAt || Date.now());
   let start = startOfDay(hb.createdAt);
   if (keys.length) start = Math.min(start, startOfDay(keyToTs(keys[0])));
-  const totalDays = Math.max(1, Math.round((end - start) / DAY) + 1);
+  // A planned rest day is not a miss, so it is pulled out of the percentage's denominator.
+  const totalDays = Math.max(1, Math.round((end - start) / DAY) + 1 - blueCount);
   const checked = greenKeys.length;
   const pct = Math.round(checked / totalDays * 100);
-  // best streak, green days only
+  // best streak: green days, with any run of rest days bridging the gap instead of breaking it
   let best = 0, run = 0, prev = null;
   for (const k of greenKeys) {
     const t = startOfDay(keyToTs(k));
-    run = (prev !== null && t - prev === DAY) ? run + 1 : 1;
+    run = (prev !== null && restBridges(hb, prev, t)) ? run + 1 : 1;
     best = Math.max(best, run);
     prev = t;
   }
-  // current streak: consecutive green days ending today (or yesterday if today isn't green)
+  // current streak: same rule, walking back from today (or yesterday if today is unmarked)
   let cur = 0;
   let cursor = startOfDay(Date.now());
-  if (hb.days[dayKey(cursor)] !== 'green') cursor -= DAY;
-  while (hb.days[dayKey(cursor)] === 'green') { cur++; cursor -= DAY; }
+  if (hb.days[dayKey(cursor)] !== 'green' && hb.days[dayKey(cursor)] !== 'blue') cursor -= DAY;
+  while (true) {
+    const v = hb.days[dayKey(cursor)];
+    if (v === 'green') cur++;
+    else if (v !== 'blue') break;
+    cursor -= DAY;
+  }
   return { totalDays, checked, pct, best, cur, since: start };
 }
 // Same shape as habitStats(), but bounded to a [fromKey, toKey] window (either end may be
@@ -2437,23 +2454,25 @@ function habitStats(hb) {
 function habitStatsInRange(hb, fromKey, toKey) {
   const keys = Object.keys(hb.days).filter(k => (!fromKey || k >= fromKey) && (!toKey || k <= toKey)).sort();
   const greenKeys = keys.filter(k => hb.days[k] === 'green');
+  const blueCount = keys.filter(k => hb.days[k] === 'blue').length;
   const habStart = startOfDay(hb.createdAt);
   const habEnd = startOfDay(hb.archivedAt || Date.now());
   const rangeStart = fromKey ? startOfDay(keyToTs(fromKey)) : habStart;
   const rangeEnd = toKey ? startOfDay(keyToTs(toKey)) : habEnd;
   const clampedStart = Math.max(habStart, rangeStart), clampedEnd = Math.min(habEnd, rangeEnd);
-  const totalDays = clampedEnd >= clampedStart ? Math.round((clampedEnd - clampedStart) / DAY) + 1 : 0;
+  const totalDaysRaw = clampedEnd >= clampedStart ? Math.round((clampedEnd - clampedStart) / DAY) + 1 : 0;
+  const totalDays = Math.max(0, totalDaysRaw - blueCount);
   const checked = greenKeys.length;
   const pct = totalDays > 0 ? Math.round(checked / totalDays * 100) : 0;
   let best = 0, run = 0, prev = null;
   for (const k of greenKeys) {
     const t = startOfDay(keyToTs(k));
-    run = (prev !== null && t - prev === DAY) ? run + 1 : 1;
+    run = (prev !== null && restBridges(hb, prev, t)) ? run + 1 : 1;
     best = Math.max(best, run);
     prev = t;
   }
   return {
-    totalDays, checked, pct, best,
+    totalDays, checked, pct, best, blue: blueCount,
     yellow: keys.filter(k => hb.days[k] === 'yellow').length,
     red: keys.filter(k => hb.days[k] === 'red').length,
   };
@@ -2531,7 +2550,7 @@ function renderHabitSheet() {
       undoableAction('“' + hb.name + '” deleted', () => { STATE.habits = STATE.habits.filter(x => x.id !== hb.id); });
     });
     for (const k of keys) {
-      const cellTitle = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '');
+      const cellTitle = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + cellLabel(hb.days[k]) + ')' : '');
       const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: cellTitle() });
       cell.addEventListener('click', () => {
         toggleHabit(hb, k);
@@ -2557,7 +2576,7 @@ function renderHabitSheet() {
   tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
   box.append(h('div.hwrap', {}, h('table.htable', {}, thead, tbody)));
-  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, yellow, or red. Click again to cycle, or a fourth time to clear it. The Dashboard tab keeps score off the green days.'));
+  if (!habs.length) box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
   return box;
 }
 
@@ -2635,13 +2654,13 @@ function renderGoalHistory() {
     } else {
       const st = habitStats(hb);
       const marks = Object.values(hb.days);
-      s = { pct: st.pct, checked: st.checked, totalDays: st.totalDays, best: st.best, yellow: marks.filter(v => v === 'yellow').length, red: marks.filter(v => v === 'red').length };
+      s = { pct: st.pct, checked: st.checked, totalDays: st.totalDays, best: st.best, blue: marks.filter(v => v === 'blue').length, yellow: marks.filter(v => v === 'yellow').length, red: marks.filter(v => v === 'red').length };
     }
     summary.append(h('div.ghist-row', {},
       h('span.ghr-name', {}, hb.name, hb.archivedAt ? h('span.ghr-tag', {}, 'retired') : null),
       h('span.ghr-pct', {}, s.pct + '%'),
       h('span.ghr-detail', {}, s.checked + ' green'
-        + (s.yellow ? ', ' + s.yellow + ' yellow' : '') + (s.red ? ', ' + s.red + ' red' : '')
+        + (s.blue ? ', ' + s.blue + ' rest' : '') + (s.yellow ? ', ' + s.yellow + ' yellow' : '') + (s.red ? ', ' + s.red + ' red' : '')
         + ' of ' + s.totalDays + ' days · best streak ' + s.best)));
   }
   wrap.append(h('div.dsec', {}, h('span.label', {}, ghistRangeLabel()), summary));
@@ -2685,7 +2704,7 @@ function renderGoalHistory() {
       const tr = h('tr', {}, h('td.hname', {}, hb.name, hb.archivedAt ? h('span.ghr-tag', {}, 'retired') : null));
       for (const k of keys) {
         const future = keyToTs(k) > Date.now();
-        const title = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '');
+        const title = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + cellLabel(hb.days[k]) + ')' : '');
         const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: title(), disabled: future });
         if (!future) cell.addEventListener('click', () => {
           toggleHabit(hb, k);
@@ -2717,8 +2736,9 @@ function renderDashboard() {
 
   // stat tiles
   if (habs.length || ret.length) {
-    const possible7 = habs.length * 7;
     const hit7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k] === 'green').length, 0);
+    const rest7 = habs.reduce((a, hb) => a + last7.filter(k => hb.days[k] === 'blue').length, 0);
+    const possible7 = habs.length * 7 - rest7; // planned rest days do not count against the week
     const totalChecks = STATE.habits.reduce((a, hb) => a + Object.keys(hb.days).length, 0);
     let bestName = '', bestVal = 0, curBest = 0, curName = '';
     for (const hb of STATE.habits) {
@@ -2775,7 +2795,7 @@ function habCard(hb, retired) {
       + (retired ? ' · retired ' + fmtDY(hb.archivedAt) : ' · streak ' + s.cur + ' (best ' + s.best + ')')));
   if (!retired) {
     const strip = h('div.strip');
-    for (const k of keys) strip.append(h('span.sq' + (hb.days[k] ? '.c-' + hb.days[k] : '') + (k === tk ? '.today' : ''), { title: k + (hb.days[k] ? ' (' + hb.days[k] + ')' : '') }));
+    for (const k of keys) strip.append(h('span.sq' + (hb.days[k] ? '.c-' + hb.days[k] : '') + (k === tk ? '.today' : ''), { title: k + (hb.days[k] ? ' (' + cellLabel(hb.days[k]) + ')' : '') }));
     card.append(strip);
   }
   return card;
@@ -3108,7 +3128,7 @@ function friendCard(fid) {
           // The snapshot is friend-authored data; only the known cell states may become
           // class names, anything else renders as a blank day.
           const v = CELL_ORDER.indexOf(raw) >= 0 ? raw : '';
-          return h('span.sq' + (v ? '.c-' + v : ''), { title: (start ? dayKey(start + i * DAY) : '') + (v ? ' (' + v + ')' : '') });
+          return h('span.sq' + (v ? '.c-' + v : ''), { title: (start ? dayKey(start + i * DAY) : '') + (v ? ' (' + cellLabel(v) + ')' : '') });
         })),
         h('span.fhstreak', {}, (Number(hb.cur) || 0) + ' day streak')));
     }
