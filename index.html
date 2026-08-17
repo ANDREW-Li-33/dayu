@@ -102,6 +102,7 @@ main{flex:1;min-height:0;position:relative}
   background-size:24px 24px;
   cursor:grab;
   touch-action:none; /* drags on the canvas are ours: panning is done in script */
+  transform-origin:0 0; /* the wheel zooms from here; script sets the scale itself */
 }
 #field.panready{cursor:grab}
 #field.panning{cursor:grabbing;user-select:none}
@@ -1525,7 +1526,7 @@ function startZoneDrag(z, e, grabEl) {
       el.classList.add('moving');
     }
     if (ev.cancelable) ev.preventDefault();
-    place(clamp(rawX, minDx, maxDx), clamp(rawY, minDy, maxDy));
+    place(clamp(rawX / zoom, minDx, maxDx), clamp(rawY / zoom, minDy, maxDy));
   };
   const teardown = () => {
     zoneDragging = false;
@@ -1561,11 +1562,11 @@ function removeZone(id) {
     STATE.zones = STATE.zones.filter(z => z.id !== id);
   });
 }
-// generic incremental drag helper: cb gets deltas since last move
+// generic incremental drag helper: cb gets deltas since last move, in logical (unzoomed) px
 function dragXY(e, elm, onMove, onUp) {
   let lx = e.clientX, ly = e.clientY;
   try { elm.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
-  const mv = ev => { onMove(ev.clientX - lx, ev.clientY - ly); lx = ev.clientX; ly = ev.clientY; };
+  const mv = ev => { onMove((ev.clientX - lx) / zoom, (ev.clientY - ly) / zoom); lx = ev.clientX; ly = ev.clientY; };
   const up = () => { elm.removeEventListener('pointermove', mv); elm.removeEventListener('pointerup', up); elm.removeEventListener('pointercancel', up); if (onUp) onUp(); };
   elm.addEventListener('pointermove', mv);
   elm.addEventListener('pointerup', up);
@@ -1615,14 +1616,14 @@ function buildNote(n) {
     let moved = false;
     try { el.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if (!moved && Math.abs(dx) + Math.abs(dy) > 5) {
+      const rawX = ev.clientX - sx, rawY = ev.clientY - sy;
+      if (!moved && Math.abs(rawX) + Math.abs(rawY) > 5) {
         moved = true;
         el.classList.add('dragging');
         n.z = ++STATE.zTop; el.style.zIndex = n.z;
       }
       if (moved) {
-        n.x = clamp(ox + dx, 0, 2600 - NOTE_W); n.y = clamp(oy + dy, 0, 1800 - 70);
+        n.x = clamp(ox + rawX / zoom, 0, 2600 - NOTE_W); n.y = clamp(oy + rawY / zoom, 0, 1800 - 70);
         el.style.left = n.x + 'px'; el.style.top = n.y + 'px';
       }
     };
@@ -1734,6 +1735,26 @@ function toggleDone(id) {
   }, 620);
 }
 
+/* ---------- zoom (mouse wheel) ---------- */
+let zoom = 1;
+const ZOOM_MIN = 0.5, ZOOM_MAX = 2;
+// Rescale around a screen point (the cursor, by default the viewport centre) so that
+// point stays under the cursor instead of the canvas jumping.
+function setZoom(newZoom, clientX, clientY) {
+  newZoom = clamp(newZoom, ZOOM_MIN, ZOOM_MAX);
+  if (newZoom === zoom) return;
+  const board = $('#board'), field = $('#field');
+  const rb = board.getBoundingClientRect();
+  const px = (clientX == null ? rb.left + rb.width / 2 : clientX) - rb.left;
+  const py = (clientY == null ? rb.top + rb.height / 2 : clientY) - rb.top;
+  const logicalX = (board.scrollLeft + px) / zoom;
+  const logicalY = (board.scrollTop + py) / zoom;
+  zoom = newZoom;
+  field.style.transform = 'scale(' + zoom + ')';
+  board.scrollLeft = logicalX * zoom - px;
+  board.scrollTop = logicalY * zoom - py;
+}
+
 /* ---------- draw-cluster mode ---------- */
 let spaceHeld = false;    // space turns any drag into a pan, the usual canvas convention
 let zoneDragging = false; // a cluster is mid-drag: hold off re-rendering it out from under the pointer
@@ -1749,10 +1770,17 @@ function wireCanvas() {
   $('#btnNote').addEventListener('click', newNoteCenter);
   $('#btnZone').addEventListener('click', () => setDrawMode(!drawMode));
 
+  // The wheel zooms the canvas instead of scrolling the page. Panning still works by
+  // dragging (see below), so nothing is lost by repurposing the wheel this way.
+  board.addEventListener('wheel', e => {
+    e.preventDefault();
+    setZoom(zoom * Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY);
+  }, { passive: false });
+
   field.addEventListener('dblclick', e => {
     if (e.target !== field) return;
     const r = field.getBoundingClientRect();
-    newNoteAt(e.clientX - r.left - NOTE_W / 2, e.clientY - r.top - 20);
+    newNoteAt((e.clientX - r.left) / zoom - NOTE_W / 2, (e.clientY - r.top) / zoom - 20);
   });
 
   // Empty canvas drags the view; empty space inside a cluster drags that cluster and its
@@ -1765,7 +1793,7 @@ function wireCanvas() {
     commitOpenNoteEditor(); // finish any title being typed before taking over the gesture
     if (!panOverride) {
       const fr = field.getBoundingClientRect();
-      const z = zoneAt(e.clientX - fr.left, e.clientY - fr.top);
+      const z = zoneAt((e.clientX - fr.left) / zoom, (e.clientY - fr.top) / zoom);
       if (z) { startZoneDrag(z, e, field); return; }
     }
     const sx = e.clientX, sy = e.clientY;
@@ -1807,13 +1835,13 @@ function wireCanvas() {
     if (!drawMode || e.target !== field || e.button !== 0) return;
     e.preventDefault();
     const r = field.getBoundingClientRect();
-    const ax = e.clientX - r.left, ay = e.clientY - r.top;
+    const ax = (e.clientX - r.left) / zoom, ay = (e.clientY - r.top) / zoom;
     const prev = $('#drawPreview');
     prev.style.display = 'block';
     let w = 0, hgt = 0, x = ax, y = ay;
     try { field.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
     const mv = ev => {
-      const bx = ev.clientX - r.left, by = ev.clientY - r.top;
+      const bx = (ev.clientX - r.left) / zoom, by = (ev.clientY - r.top) / zoom;
       x = Math.min(ax, bx); y = Math.min(ay, by); w = Math.abs(bx - ax); hgt = Math.abs(by - ay);
       Object.assign(prev.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: hgt + 'px' });
     };
@@ -2082,6 +2110,33 @@ function habitStats(hb) {
   while (hb.days[dayKey(cursor)] === 'green') { cur++; cursor -= DAY; }
   return { totalDays, checked, pct, best, cur, since: start };
 }
+// Same shape as habitStats(), but bounded to a [fromKey, toKey] window (either end may be
+// blank for open-ended). Used by the Archive's Goal history date filter, where "best streak"
+// and the day counts should reflect only the selected window, not the goal's whole life.
+function habitStatsInRange(hb, fromKey, toKey) {
+  const keys = Object.keys(hb.days).filter(k => (!fromKey || k >= fromKey) && (!toKey || k <= toKey)).sort();
+  const greenKeys = keys.filter(k => hb.days[k] === 'green');
+  const habStart = startOfDay(hb.createdAt);
+  const habEnd = startOfDay(hb.archivedAt || Date.now());
+  const rangeStart = fromKey ? startOfDay(keyToTs(fromKey)) : habStart;
+  const rangeEnd = toKey ? startOfDay(keyToTs(toKey)) : habEnd;
+  const clampedStart = Math.max(habStart, rangeStart), clampedEnd = Math.min(habEnd, rangeEnd);
+  const totalDays = clampedEnd >= clampedStart ? Math.round((clampedEnd - clampedStart) / DAY) + 1 : 0;
+  const checked = greenKeys.length;
+  const pct = totalDays > 0 ? Math.round(checked / totalDays * 100) : 0;
+  let best = 0, run = 0, prev = null;
+  for (const k of greenKeys) {
+    const t = startOfDay(keyToTs(k));
+    run = (prev !== null && t - prev === DAY) ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = t;
+  }
+  return {
+    totalDays, checked, pct, best,
+    yellow: keys.filter(k => hb.days[k] === 'yellow').length,
+    red: keys.filter(k => hb.days[k] === 'red').length,
+  };
+}
 
 function lastNDaysKeys(n) {
   const out = [];
@@ -2208,6 +2263,17 @@ function monthDayKeys(y, m) {
   for (let d = 1; d <= days; d++) out.push(y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'));
   return out;
 }
+const GHIST_QUICK = [['all', 'All time'], ['30', 'Last 30 days'], ['90', 'Last 90 days'], ['year', 'This year'], ['', 'Custom range']];
+let ghistFilters = { from: '', to: '', quick: 'all' };
+function ghistHasFilter() { return !!(ghistFilters.from || ghistFilters.to); }
+function ghistRangeLabel() {
+  const f = ghistFilters.from, t = ghistFilters.to;
+  if (f && t) return 'Totals, ' + fmtDY(keyToTs(f)) + ' to ' + fmtDY(keyToTs(t));
+  if (f) return 'Totals since ' + fmtDY(keyToTs(f));
+  if (t) return 'Totals through ' + fmtDY(keyToTs(t));
+  return 'Totals so far';
+}
+
 function renderGoalHistory() {
   const wrap = h('div');
   const all = STATE.habits.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -2216,29 +2282,66 @@ function renderGoalHistory() {
     return wrap;
   }
 
-  // per-goal totals across the entire history
+  // --- date range filter ---
+  const quickSel = h('select.input', {}, GHIST_QUICK.map(([v, l]) => h('option', { value: v, selected: ghistFilters.quick === v }, l)));
+  const fromIn = h('input.input', { type: 'date', value: ghistFilters.from, title: 'From this day' });
+  const toIn = h('input.input', { type: 'date', value: ghistFilters.to, title: 'Through this day' });
+  quickSel.addEventListener('change', () => {
+    ghistFilters.quick = quickSel.value;
+    const now = Date.now();
+    if (quickSel.value === 'all') { ghistFilters.from = ''; ghistFilters.to = ''; }
+    else if (quickSel.value === '30') { ghistFilters.from = dayKey(now - 29 * DAY); ghistFilters.to = ''; }
+    else if (quickSel.value === '90') { ghistFilters.from = dayKey(now - 89 * DAY); ghistFilters.to = ''; }
+    else if (quickSel.value === 'year') { ghistFilters.from = new Date().getFullYear() + '-01-01'; ghistFilters.to = ''; }
+    // '' (custom) leaves from/to as already typed
+    renderArchive();
+  });
+  fromIn.addEventListener('change', () => { ghistFilters.from = fromIn.value; ghistFilters.quick = ''; renderArchive(); });
+  toIn.addEventListener('change', () => { ghistFilters.to = toIn.value; ghistFilters.quick = ''; renderArchive(); });
+  wrap.append(h('div.filters', {}, h('div.frow', {}, quickSel, fromIn, h('span', { style: { color: 'var(--ink3)', fontSize: '12px' } }, 'to'), toIn)));
+
+  const hasFilter = ghistHasFilter();
+
+  // per-goal totals: the filtered window if one is set, otherwise the whole history
   const summary = h('div.ghist-sum');
   for (const hb of all) {
-    const s = habitStats(hb);
-    const marks = Object.values(hb.days);
-    const y = marks.filter(v => v === 'yellow').length, rd = marks.filter(v => v === 'red').length;
+    let s;
+    if (hasFilter) {
+      s = habitStatsInRange(hb, ghistFilters.from, ghistFilters.to);
+    } else {
+      const st = habitStats(hb);
+      const marks = Object.values(hb.days);
+      s = { pct: st.pct, checked: st.checked, totalDays: st.totalDays, best: st.best, yellow: marks.filter(v => v === 'yellow').length, red: marks.filter(v => v === 'red').length };
+    }
     summary.append(h('div.ghist-row', {},
       h('span.ghr-name', {}, hb.name, hb.archivedAt ? h('span.ghr-tag', {}, 'retired') : null),
       h('span.ghr-pct', {}, s.pct + '%'),
       h('span.ghr-detail', {}, s.checked + ' green'
-        + (y ? ', ' + y + ' yellow' : '') + (rd ? ', ' + rd + ' red' : '')
+        + (s.yellow ? ', ' + s.yellow + ' yellow' : '') + (s.red ? ', ' + s.red + ' red' : '')
         + ' of ' + s.totalDays + ' days · best streak ' + s.best)));
   }
-  wrap.append(h('div.dsec', {}, h('span.label', {}, 'Totals so far'), summary));
+  wrap.append(h('div.dsec', {}, h('span.label', {}, ghistRangeLabel()), summary));
 
-  const months = monthsWithHistory();
   const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const tk = todayKey();
+  const months = monthsWithHistory().filter(({ y, m }) => {
+    if (!hasFilter) return true;
+    const first = y + '-' + String(m + 1).padStart(2, '0') + '-01';
+    const last = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(new Date(y, m + 1, 0).getDate()).padStart(2, '0');
+    if (ghistFilters.to && first > ghistFilters.to) return false;
+    if (ghistFilters.from && last < ghistFilters.from) return false;
+    return true;
+  });
+  let shown = 0;
   for (const { y, m } of months) {
-    const keys = monthDayKeys(y, m);
-    // Skip a month nobody marked, unless it is the current one.
-    const anyMarks = all.some(hb => keys.some(k => hb.days[k]));
-    if (!anyMarks && monthKeyOf(Date.now()) !== y + '-' + String(m + 1).padStart(2, '0')) continue;
+    let keys = monthDayKeys(y, m);
+    if (hasFilter) keys = keys.filter(k => (!ghistFilters.from || k >= ghistFilters.from) && (!ghistFilters.to || k <= ghistFilters.to));
+    if (!keys.length) continue;
+    if (!hasFilter) {
+      // Skip a month nobody marked, unless it is the current one.
+      const anyMarks = all.some(hb => keys.some(k => hb.days[k]));
+      if (!anyMarks && monthKeyOf(Date.now()) !== y + '-' + String(m + 1).padStart(2, '0')) continue;
+    }
     // A goal belongs in this month if it was marked here, or if it was already alive then
     // and had not yet been retired: no rows for months before a goal existed.
     const monthEnd = keyToTs(keys[keys.length - 1]);
@@ -2273,7 +2376,9 @@ function renderGoalHistory() {
     wrap.append(h('div.dsec', {},
       h('span.label', {}, label),
       h('div.hwrap', {}, h('table.htable.hmonth', {}, thead, tbody))));
+    shown++;
   }
+  if (hasFilter && !shown) wrap.append(h('div.empty', {}, 'Nothing tracked in this range.'));
   return wrap;
 }
 
