@@ -328,6 +328,24 @@ main{flex:1;min-height:0;position:relative}
 .wish-state.unlocked{color:var(--accent)}
 .claimed .gname{text-decoration:line-through;color:var(--ink3)}
 
+/* wishlist cards with a product picture */
+.gcard.wcard{display:flex;gap:12px;align-items:flex-start}
+.wthumbwrap{
+  flex:0 0 auto;display:block;width:58px;height:58px;border-radius:9px;overflow:hidden;
+  background:var(--raise);border:1px solid var(--line);
+}
+a.wthumbwrap:hover{border-color:var(--accent)}
+.wthumb{width:100%;height:100%;object-fit:contain;display:block}
+.wmain{flex:1;min-width:0}
+.gname.wlink{color:inherit;text-decoration:none}
+.gname.wlink:hover{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+/* a claimed reward stays struck through even when its title is a link */
+.claimed .gname,.claimed .gname.wlink,.claimed .gname.wlink:hover{text-decoration:line-through;color:var(--ink3)}
+.lnkbtn{width:26px;height:26px;border-radius:7px;color:var(--ink3);font-size:13px;line-height:1}
+.lnkbtn:hover{background:var(--accent-soft);color:var(--ink)}
+.wprev{margin-top:12px}
+.wprev img{max-width:150px;max-height:150px;border-radius:10px;border:1px solid var(--line);background:var(--raise);display:block}
+
 /* ---------- toast / misc ---------- */
 #toastRoot{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;gap:8px;align-items:center}
 .toast{
@@ -634,7 +652,7 @@ function save() {
 }
 function blankState() {
   return {
-    v: 4, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
+    v: 5, notes: [], cats: [], zones: [], prompts: [], goals: [], wishes: [], habits: [], zTop: 10,
     ai: { key: '', model: 'gemini-flash-latest', lastVersion: '' },
     meta: { updatedAt: Date.now() },
   };
@@ -692,6 +710,15 @@ function migrate(s, adoptLocal) {
     }
     s.v = 4;
   }
+  // v5: wishes can carry a shop link and a picture.
+  if ((s.v || 1) < 5) {
+    if (!Array.isArray(s.wishes)) s.wishes = [];
+    for (const w of s.wishes) {
+      if (typeof w.url !== 'string') w.url = '';
+      if (typeof w.img !== 'string') w.img = '';
+    }
+    s.v = 5;
+  }
   return s;
 }
 function seedState() {
@@ -713,7 +740,7 @@ function seedState() {
     mk('Draw your own cluster with the Cluster button below', 690, 280, { catId: catStart.id }),
   );
   s.goals.push({ id: uid(), name: 'Warm-up: clear 3 tasks', target: 3, period: 'week', catId: null, pinned: true, createdAt: now });
-  s.wishes.push({ id: uid(), text: 'A fancy coffee, on me', goalId: s.goals[0].id, claimedAt: null, createdAt: now });
+  s.wishes.push({ id: uid(), text: 'A fancy coffee, on me', goalId: s.goals[0].id, url: '', img: '', claimedAt: null, createdAt: now });
   s.prompts.push(
     { id: uid(), scope: 'archive', name: 'Weekly recap', text: 'Summarize what I completed, grouped by category. Keep it brief and encouraging.' },
     { id: uid(), scope: 'archive', name: 'Find patterns', text: 'Look at my completed tasks and point out patterns: which categories dominate, what I finish fastest, and one suggestion for next week.' },
@@ -735,6 +762,63 @@ function loadState() {
     } catch (e) { /* fall through to a fresh board */ }
   }
   return seedState();
+}
+
+/* ---------- links & product images ---------- */
+// Only ever hand http(s) to an href or img src: a pasted "javascript:" string must never
+// become a live link.
+function safeUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  try {
+    const u = new URL(s);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+  } catch (e) { return ''; }
+}
+// True only when "amazon" is the registrable name, so amazon.com and amazon.co.uk count
+// while a lookalike such as amazon.evil.com or www.amazon.com.evil.com does not.
+const SECOND_LEVEL = ['co', 'com', 'net', 'org'];
+function isAmazonHost(host) {
+  const p = String(host || '').toLowerCase().split('.');
+  if (p.length < 2) return false;
+  if (p[p.length - 2] === 'amazon') return true;                                  // amazon.com, amazon.de
+  return p.length >= 3 && p[p.length - 3] === 'amazon' && SECOND_LEVEL.indexOf(p[p.length - 2]) >= 0; // amazon.co.uk
+}
+// What someone types is rarely a perfect URL. "amazon.com/dp/X" means https, so treat it
+// that way; anything carrying a scheme we do not serve is still refused outright.
+function normalizeUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const direct = safeUrl(s);
+  if (direct) return direct;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(s)) return ''; // had a scheme, and it was not http(s)
+  const guessed = safeUrl('https://' + s.replace(/^\/+/, ''));
+  if (!guessed) return '';
+  // Only supply the scheme when what came before the first slash is really a domain,
+  // so a sentence typed into the box is rejected rather than becoming a dead link.
+  try {
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(new URL(guessed).hostname)) return '';
+  } catch (e) { return ''; }
+  return guessed;
+}
+// Amazon puts the product id (ASIN) in the path: /dp/XXXX, /gp/product/XXXX, /product/XXXX.
+function amazonAsin(url) {
+  const s = safeUrl(url);
+  if (!s) return '';
+  let host;
+  try { host = new URL(s).hostname; } catch (e) { return ''; }
+  if (!isAmazonHost(host)) return '';
+  const m = s.match(/\/(?:dp|gp\/product|product|gp\/aw\/d)\/([A-Z0-9]{10})(?:[/?]|$)/i);
+  return m ? m[1].toUpperCase() : '';
+}
+// Amazon's long-standing by-ASIN image endpoint. It answers for most catalogue items and
+// returns a 1x1 placeholder for the rest, which the <img> load handler screens out.
+function amazonImageFor(url) {
+  const asin = amazonAsin(url);
+  return asin ? 'https://m.media-amazon.com/images/P/' + asin + '.01._SCLZZZZZZZ_.jpg' : '';
+}
+function wishImageUrl(w) {
+  return safeUrl(w.img) || amazonImageFor(w.url) || '';
 }
 
 /* ---------- undo / toast ---------- */
@@ -2774,37 +2858,131 @@ function renderGoals() {
   // --- wishlist ---
   wishCol.append(h('div.label', { style: { marginBottom: '10px' } }, 'Wishlist: rewards you’ve promised yourself'));
   if (!STATE.wishes.length) wishCol.append(h('div.empty', {}, 'Nothing on the wishlist yet.'));
-  for (const w of STATE.wishes) {
-    const goal = STATE.goals.find(g => g.id === w.goalId);
-    const unlocked = !goal || goalMet(goal);
-    let stateEl;
-    if (w.claimedAt) stateEl = h('span.wish-state', { style: { color: 'var(--ink3)' } }, 'Claimed ' + fmtD(w.claimedAt) + ' 🎉');
-    else if (!goal) stateEl = h('span.wish-state.unlocked', {}, 'Yours whenever, no goal attached');
-    else if (unlocked) stateEl = h('span.wish-state.unlocked', {}, 'Unlocked by “' + goal.name + '”!');
-    else stateEl = h('span.wish-state.locked', {}, (goal.target - goalCount(goal)) + ' more task' + (goal.target - goalCount(goal) === 1 ? '' : 's') + ' to unlock (' + goal.name + ')');
-    wishCol.append(h('div.gcard' + (w.claimedAt ? '.claimed' : ''), {},
-      h('div.ghead', {},
-        h('span.gname', {}, w.text),
-        !w.claimedAt && unlocked ? h('button.btn.primary.small', { onclick: e => {
-          w.claimedAt = Date.now(); save();
-          const r = e.target.getBoundingClientRect();
-          confetti(r.left, r.top);
-          renderGoals();
-        } }, 'Claim it') : null,
-        h('button.xbtn', { title: 'Delete', onclick: () => undoableAction('Wish deleted', () => { STATE.wishes = STATE.wishes.filter(x => x.id !== w.id); }) }, '✕')),
-      h('div.gmeta', {}, stateEl)));
-  }
+  for (const w of STATE.wishes) wishCol.append(wishCard(w));
+
   const wText = h('input.input.grow', { placeholder: 'Treat yourself to… (e.g. that overpriced sandwich)', maxLength: 80 });
+  const wUrl = h('input.input.grow', { placeholder: 'Paste a shop link (optional). Amazon links pull in a picture', maxLength: 600 });
   const wGoal = h('select.input', {}, h('option', { value: '' }, 'no goal, just a wish'), STATE.goals.map(g => h('option', { value: g.id }, 'unlocks with: ' + g.name)));
+  const addWish = () => {
+    if (!wText.value.trim()) { wText.focus(); return; }
+    STATE.wishes.push({
+      id: uid(), text: wText.value.trim(), goalId: wGoal.value || null,
+      url: normalizeUrl(wUrl.value), img: '', claimedAt: null, createdAt: Date.now(),
+    });
+    save(); renderGoals();
+  };
+  wUrl.addEventListener('keydown', e => { if (e.key === 'Enter') addWish(); });
+  wText.addEventListener('keydown', e => { if (e.key === 'Enter') wUrl.focus(); });
   wishCol.append(h('div.newform', {},
     h('div.label', {}, 'New wish'),
     h('div.frow', {}, wText),
-    h('div.frow', {}, wGoal,
+    h('div.frow', {}, wUrl),
+    h('div.frow', {}, wGoal, h('button.btn.primary.small', { onclick: addWish }, 'Add'))));
+}
+
+function wishCard(w) {
+  const goal = STATE.goals.find(g => g.id === w.goalId);
+  const unlocked = !goal || goalMet(goal);
+  const link = safeUrl(w.url);
+  const card = h('div.gcard.wcard' + (w.claimedAt ? '.claimed' : ''));
+
+  // picture, when we can get one. A dead or placeholder image removes itself rather than
+  // leaving a broken frame behind.
+  const imgSrc = wishImageUrl(w);
+  if (imgSrc) {
+    // Not lazy: these are a few small thumbnails, and lazy ones below the fold sit
+    // unloaded until scrolled to, which reads as a broken picture.
+    const thumb = h('img.wthumb', { src: imgSrc, alt: '', referrerPolicy: 'no-referrer' });
+    thumb.addEventListener('error', () => shell.remove());
+    // Amazon answers unknown ids with a 1x1 transparent pixel, which loads "successfully".
+    thumb.addEventListener('load', () => { if (thumb.naturalWidth <= 1 || thumb.naturalHeight <= 1) shell.remove(); });
+    const shell = link
+      ? h('a.wthumbwrap', { href: link, target: '_blank', rel: 'noopener noreferrer', title: 'Open ' + w.text }, thumb)
+      : h('span.wthumbwrap', {}, thumb);
+    card.append(shell);
+  }
+
+  const main = h('div.wmain');
+  card.append(main);
+
+  let stateEl = null;
+  if (w.claimedAt) stateEl = h('span.wish-state', { style: { color: 'var(--ink3)' } }, 'Claimed ' + fmtD(w.claimedAt) + ' 🎉');
+  else if (goal && unlocked) stateEl = h('span.wish-state.unlocked', {}, 'Unlocked by “' + goal.name + '”!');
+  else if (goal) stateEl = h('span.wish-state.locked', {}, (goal.target - goalCount(goal)) + ' more task' + (goal.target - goalCount(goal) === 1 ? '' : 's') + ' to unlock (' + goal.name + ')');
+
+  main.append(h('div.ghead', {},
+    link
+      ? h('a.gname.wlink', { href: link, target: '_blank', rel: 'noopener noreferrer' }, w.text)
+      : h('span.gname', {}, w.text),
+    !w.claimedAt && unlocked ? h('button.btn.primary.small', { onclick: e => {
+      w.claimedAt = Date.now(); save();
+      const r = e.target.getBoundingClientRect();
+      confetti(r.left, r.top);
+      renderGoals();
+    } }, 'Claim it') : null,
+    h('button.lnkbtn', { title: 'Edit link and picture', onclick: () => openWishLinkEditor(w) }, '🔗'),
+    h('button.xbtn', { title: 'Delete', onclick: () => undoableAction('Wish deleted', () => { STATE.wishes = STATE.wishes.filter(x => x.id !== w.id); }) }, '✕')));
+  if (stateEl) main.append(h('div.gmeta', {}, stateEl));
+  return card;
+}
+
+// Attach or change the shop link and picture for an existing wish.
+function openWishLinkEditor(w) {
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const urlIn = h('input.input.grow', { placeholder: 'https://www.amazon.com/dp/…', value: w.url || '', maxLength: 600 });
+  const imgIn = h('input.input.grow', { placeholder: 'Picture link (optional, overrides the automatic one)', value: w.img || '', maxLength: 600 });
+  const preview = h('div.wprev');
+  const note = h('div.setnote');
+  // Each keystroke starts a new attempt. Stamp it, so a slow earlier image cannot come
+  // back later and describe itself over the newer one.
+  let paintGen = 0;
+  const paint = () => {
+    const gen = ++paintGen;
+    preview.innerHTML = '';
+    const nUrl = normalizeUrl(urlIn.value), nImg = normalizeUrl(imgIn.value);
+    const src = nImg || amazonImageFor(nUrl);
+    if (!src) {
+      if (urlIn.value.trim() && !nUrl) note.textContent = 'That shop link is not a web address Dayu can open.';
+      else if (imgIn.value.trim() && !nImg) note.textContent = 'That picture link is not a web address Dayu can open.';
+      else if (!urlIn.value.trim()) note.textContent = 'Paste a shop link. Amazon product links find their own picture; for other shops, paste a picture link too.';
+      else note.textContent = 'No picture found for that link. Right-click the product image in your browser, copy its address, and paste it below.';
+      return;
+    }
+    const im = h('img', { src, alt: '', referrerPolicy: 'no-referrer' });
+    im.addEventListener('load', () => {
+      if (gen !== paintGen) return;
+      if (im.naturalWidth <= 1 || im.naturalHeight <= 1) { preview.innerHTML = ''; note.textContent = 'Amazon has no picture on file for that item. Paste a picture link below instead.'; }
+      else note.textContent = 'This is how it will look.';
+    });
+    im.addEventListener('error', () => {
+      if (gen !== paintGen) return;
+      preview.innerHTML = ''; note.textContent = 'That picture would not load. Check the address, or leave it blank.';
+    });
+    preview.append(im);
+    note.textContent = 'Loading the picture…';
+  };
+  urlIn.addEventListener('input', paint);
+  imgIn.addEventListener('input', paint);
+  paint();
+
+  const body = h('div.sbody', {},
+    h('h1', { style: { fontSize: '19px', fontWeight: '800', marginBottom: '2px' } }, w.text),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '16px', fontSize: '13px' } }, 'Link this to where you would buy it.'),
+    h('div.setsec', {}, h('span.label', {}, 'Shop link'), h('div.frow', { style: { display: 'flex', marginTop: '8px' } }, urlIn)),
+    h('div.setsec', {}, h('span.label', {}, 'Picture'), h('div.frow', { style: { display: 'flex', marginTop: '8px' } }, imgIn), preview, note));
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {},
+      h('button.btn.danger.small', { onclick: () => { w.url = ''; w.img = ''; save(); closeModal(); renderGoals(); } }, 'Remove link'),
       h('button.btn.primary.small', { onclick: () => {
-        if (!wText.value.trim()) { wText.focus(); return; }
-        STATE.wishes.push({ id: uid(), text: wText.value.trim(), goalId: wGoal.value || null, claimedAt: null, createdAt: Date.now() });
-        save(); renderGoals();
-      } }, 'Add'))));
+        // Refuse to close on something we would only throw away: say so and let them fix it.
+        if (urlIn.value.trim() && !normalizeUrl(urlIn.value)) { note.textContent = 'That shop link is not a web address Dayu can open. Fix it, or clear the box.'; urlIn.focus(); return; }
+        if (imgIn.value.trim() && !normalizeUrl(imgIn.value)) { note.textContent = 'That picture link is not a web address Dayu can open. Fix it, or clear the box.'; imgIn.focus(); return; }
+        w.url = normalizeUrl(urlIn.value); w.img = normalizeUrl(imgIn.value);
+        save(); closeModal(); renderGoals();
+      } }, 'Save')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
+  setTimeout(() => urlIn.focus(), 0);
 }
 
 /* ---------- boot ---------- */
