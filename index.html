@@ -883,6 +883,10 @@ function migrate(s) {
   if (!s.meta) s.meta = { updatedAt: Date.now() };
   if (!Array.isArray(s.habits)) s.habits = [];
   if (!Array.isArray(s.notes)) s.notes = [];
+  // `editing` means "this card's title box is open right now". It is a fact about one
+  // screen, never about the board, so it must not survive a reload or ride along to
+  // another device: a board that loads with a phantom open editor looks stuck.
+  for (const n of s.notes) delete n.editing;
   if (!Array.isArray(s.wishes)) s.wishes = [];
   if (!Array.isArray(s.goals)) s.goals = [];
   if (!Array.isArray(s.cats)) s.cats = [];
@@ -1560,9 +1564,13 @@ async function syncNow() {
     const localTs = (STATE.meta && STATE.meta.updatedAt) || 0;
     const remoteTs = remote ? Date.parse(remote.updated_at) : 0;
     // Never swap the board out from under an open sheet: the user may be mid-edit in it.
-    // A title being typed on a card counts as busy too: rebuilding the board around it
-    // both loses the text and throws from inside the removal loop.
-    const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging || $('.note textarea');
+    // A title counts only while it is actually being typed into. Testing for the box alone
+    // was wrong: an editor left open and unfocused blocked every pull from then on, so the
+    // board pushed its changes but never received any. An unfocused box has already
+    // committed on blur, so removing it neither loses text nor re-enters the render.
+    const editing = $('.note textarea');
+    const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging
+      || (editing && document.activeElement === editing);
     if (remote && remoteTs > localTs + 500 && !busy) {
       STATE = migrate(remote.data);
       STATE.meta.updatedAt = remoteTs;
