@@ -337,6 +337,7 @@ main{flex:1;min-height:0;position:relative}
 .mdbody pre code{background:none;border:none;padding:0}
 .mdbody blockquote{margin:0 0 8px;padding:2px 0 2px 12px;border-left:3px solid var(--line2);color:var(--ink3)}
 .mdbody hr{border:none;border-top:1px solid var(--line);margin:13px 0}
+.mdbody img{max-width:100%;height:auto;display:block;margin:9px 0;border-radius:9px;border:1px solid var(--line);background:var(--raise)}
 .mdbody .mdbox{display:inline-block;width:11px;height:11px;border:1.5px solid var(--line2);border-radius:3px;margin-right:6px;vertical-align:-1px}
 .mdbody .mdbox.on{background:var(--good);border-color:var(--good)}
 .sheet .sec{margin-top:20px}
@@ -460,8 +461,12 @@ a.wthumbwrap:hover{border-color:var(--accent)}
 .wprev img{max-width:150px;max-height:150px;border-radius:10px;border:1px solid var(--line);background:var(--raise);display:block}
 
 /* ---------- friends ---------- */
-.fhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.fhead .label{flex:1}
+.fhead{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fhead .label{flex:1;min-width:80px}
+.frefresh .ric{display:inline-block;font-size:13px;line-height:1}
+.frefresh.spinning .ric{animation:rspin .8s linear infinite}
+@keyframes rspin{to{transform:rotate(360deg)}}
+.frefresh:disabled{opacity:.6;cursor:default}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
 .fcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
 .fid{display:flex;align-items:center;gap:10px}
@@ -529,10 +534,17 @@ body.canvasview #toastRoot{bottom:78px}
   position:fixed;z-index:1400;background:var(--surface);border:1px solid var(--line);
   border-radius:12px;box-shadow:var(--shadow-big);padding:12px;display:flex;flex-direction:column;gap:9px;width:230px;
 }
-.zonepop .dots{display:flex;gap:7px}
+.zonepop{width:250px}
+.zonepop .dots{display:flex;gap:7px;flex-wrap:wrap}
 .zonepop .cdot{width:26px;height:26px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}
 .zonepop .cdot:hover{border-color:var(--line2)}
 .zonepop .cdot.on{border-color:var(--ink)}
+.zone .zshared{font-size:11px;line-height:1;flex:0 0 auto}
+.sharebox{border-top:1px solid var(--line);padding-top:9px;display:flex;flex-direction:column;gap:7px}
+.sharenote{font-size:11.5px;color:var(--ink3);line-height:1.45}
+.sharerow{display:flex;align-items:center;gap:7px}
+.sharename{flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sharepick{display:flex;gap:6px;align-items:center}
 .empty{color:var(--ink3);text-align:center;padding:40px 20px;font-size:14px}
 
 /* ---------- welcome gate ---------- */
@@ -780,13 +792,21 @@ const TICK_SVG = '<svg viewBox="0 0 14 14" aria-hidden="true"><path class="tickp
 function imeBusy(e) { return !!(e && (e.isComposing || e.keyCode === 229)); }
 
 /* ---------- sticky palette (fixed, not themed — stickies are physical) ---------- */
+// `bg` is the paper, `deep` is the ink used for that category's border, dot and label, so
+// every `deep` has to stay readable on its own `bg`.
 const PAL = [
-  { id: 'yellow', name: 'Lemon',  bg: '#FFE97D', deep: '#7A6000' },
-  { id: 'rose',   name: 'Rose',   bg: '#FFC9D4', deep: '#96324B' },
-  { id: 'peach',  name: 'Peach',  bg: '#FFD8AC', deep: '#8F520D' },
-  { id: 'mint',   name: 'Mint',   bg: '#BEE9C8', deep: '#1D663F' },
-  { id: 'sky',    name: 'Sky',    bg: '#BDDFFF', deep: '#1B5795' },
-  { id: 'lilac',  name: 'Lilac',  bg: '#DCCEFF', deep: '#5F3BA1' },
+  { id: 'yellow', name: 'Lemon',   bg: '#FFE97D', deep: '#7A6000' },
+  { id: 'rose',   name: 'Rose',    bg: '#FFC9D4', deep: '#96324B' },
+  { id: 'peach',  name: 'Peach',   bg: '#FFD8AC', deep: '#8F520D' },
+  { id: 'mint',   name: 'Mint',    bg: '#BEE9C8', deep: '#1D663F' },
+  { id: 'sky',    name: 'Sky',     bg: '#BDDFFF', deep: '#1B5795' },
+  { id: 'lilac',  name: 'Lilac',   bg: '#DCCEFF', deep: '#5F3BA1' },
+  { id: 'coral',  name: 'Coral',   bg: '#FFC3B0', deep: '#98371C' },
+  { id: 'teal',   name: 'Teal',    bg: '#A9E6E1', deep: '#0F5C58' },
+  { id: 'lime',   name: 'Lime',    bg: '#D8EFA2', deep: '#4B6910' },
+  { id: 'sand',   name: 'Sand',    bg: '#EADFC1', deep: '#6C5820' },
+  { id: 'slate',  name: 'Slate',   bg: '#D2DAE7', deep: '#3C4A61' },
+  { id: 'orchid', name: 'Orchid',  bg: '#F5C7ED', deep: '#872C74' },
 ];
 const palById = id => PAL.find(p => p.id === id) || PAL[0];
 const DEFAULT_NOTE_BG = PAL[0].bg;
@@ -1024,11 +1044,29 @@ function mdEsc(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 const MD_UL = /^\s*[-*+]\s+/, MD_OL = /^\s*\d+[.)]\s+/, MD_QUOTE = /^\s*>\s?/;
-function mdInline(s) {
+// A picture is either one pasted into this task, which is kept beside the task and written
+// as `img:ID` so the Markdown source stays readable instead of carrying a wall of base64,
+// or an ordinary web address. Anything else is left as plain text.
+const MD_DATA_IMG = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/;
+function mdImgSrc(raw, imgs) {
+  const s = String(raw || '').trim();
+  const m = s.match(/^img:([A-Za-z0-9_-]{1,40})$/);
+  if (m) {
+    const d = imgs && imgs[m[1]];
+    return d && MD_DATA_IMG.test(d) ? d : '';
+  }
+  return safeUrl(s);
+}
+function mdInline(s, imgs) {
   // Code spans come out first: whatever is inside them is text, not markup.
   const codes = [];
   let t = String(s).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
   t = mdEsc(t);
+  // Pictures first: ![alt](src) would otherwise be swallowed by the link rule below.
+  t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => {
+    const safe = mdImgSrc(src, imgs);
+    return safe ? '<img src="' + mdEsc(safe) + '" alt="' + alt + '" loading="lazy">' : m;
+  });
   t = t.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, (m, text, url) => {
     const safe = safeUrl(url.replace(/&amp;/g, '&'));
     return safe ? '<a href="' + mdEsc(safe) + '" target="_blank" rel="noopener noreferrer">' + (text || mdEsc(safe)) + '</a>' : m;
@@ -1039,13 +1077,13 @@ function mdInline(s) {
   t = t.replace(/~~([^~]+)~~/g, '<del>$1</del>');
   return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + mdEsc(codes[Number(i)]) + '</code>');
 }
-function mdToHtml(src) {
+function mdToHtml(src, imgs) {
   const lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
   let out = '', i = 0;
   const para = [];
   const flush = () => {
     if (!para.length) return;
-    out += '<p>' + mdInline(para.join('\n')).replace(/\n/g, '<br>') + '</p>';
+    out += '<p>' + mdInline(para.join('\n'), imgs).replace(/\n/g, '<br>') + '</p>';
     para.length = 0;
   };
   while (i < lines.length) {
@@ -1065,14 +1103,14 @@ function mdToHtml(src) {
     if (head) {
       flush();
       const tag = 'h' + (head[1].length + 2);                  // # is h3: the task title above is the h1 here
-      out += '<' + tag + '>' + mdInline(head[2]) + '</' + tag + '>';
+      out += '<' + tag + '>' + mdInline(head[2], imgs) + '</' + tag + '>';
       i++; continue;
     }
     if (MD_QUOTE.test(line)) {
       flush();
       const buf = [];
       while (i < lines.length && MD_QUOTE.test(lines[i])) { buf.push(lines[i].replace(MD_QUOTE, '')); i++; }
-      out += '<blockquote>' + mdToHtml(buf.join('\n')) + '</blockquote>';
+      out += '<blockquote>' + mdToHtml(buf.join('\n'), imgs) + '</blockquote>';
       continue;
     }
     const ul = MD_UL.test(line), ol = !ul && MD_OL.test(line);
@@ -1085,7 +1123,7 @@ function mdToHtml(src) {
         const box = text.match(/^\[([ xX])\]\s+/);             // - [ ] and - [x], as written
         let pre = '';
         if (box) { pre = '<span class="mdbox' + (box[1] === ' ' ? '' : ' on') + '"></span>'; text = text.slice(box[0].length); }
-        items += '<li>' + pre + mdInline(text) + '</li>';
+        items += '<li>' + pre + mdInline(text, imgs) + '</li>';
         i++;
       }
       out += ul ? '<ul>' + items + '</ul>' : '<ol>' + items + '</ol>';
@@ -1372,6 +1410,7 @@ function applySession(access, refresh) {
     storeSet(STORE_KEY, JSON.stringify(STATE));
     renderAll();
     resetFriendsCache(); // the friends list on screen belongs to whoever was here before
+    resetSharedCache();
   }
   if (uidNew) CFG.lastUserId = uidNew;
   saveCfg();
@@ -1590,6 +1629,7 @@ async function syncNow() {
       syncStatus('ok');
     }
     await pushProgress(); // friends see the trimmed snapshot, never the board itself
+    await syncShared();   // clusters shared with a friend are their own little boards
   } catch (e) {
     syncStatus('off');
     if (!storageOK) showNotice('sandbox', 'This preview page can’t reach the internet, so sync and friends are off here. They work when Dayu runs locally or on your own hosting.');
@@ -1867,16 +1907,228 @@ async function friendsPollTick() {
       }
     } else await frMissing(r);
   } catch (e) { /* offline; the next tick tries again */ }
-  if (FR.ticks % 3 === 0) {
+  // Friends' progress only changes when the whole set is refetched. While the Goals page is
+  // actually on screen that happens every tick, so a friend ticking a goal shows up within
+  // the minute; elsewhere it drops to every third tick, since nobody is looking.
+  const watching = currentPage() === 'goals';
+  if (watching || FR.ticks % 3 === 0) {
     if (!FR.profilePushed) pushProfile(); // a failed first push must not hide this person forever
     if (await loadFriends()) repaintFriendsIfSafe();
   }
+  // Someone else may be moving things around inside a shared cluster right now, so the
+  // canvas keeps up with it on the same beat.
+  if (sharedZones().length || FR.ticks % 3 === 0) await syncShared();
 }
 function initFriends() {
   if (signedIn()) { pushProfile(); loadFriends().then(ok => { if (ok) repaintFriendsIfSafe(); }); }
   setInterval(friendsPollTick, 20000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') friendsPollTick(); });
 }
+
+/* ---------- shared clusters ---------- */
+// A shared cluster is one row everyone in it may edit. Its tasks are mirrored into this
+// board as ordinary tasks, so the canvas, archive and goals need to know nothing about
+// sharing; only this layer does. What is shared is the cluster's name, colour, size and
+// tasks. Where it sits on the canvas is yours alone, so task positions travel relative to
+// the cluster's own corner and land wherever you have put it.
+const SH = { rows: {}, members: {}, seen: {}, pushed: {}, ready: false, missing: false, syncing: false };
+function resetSharedCache() { SH.rows = {}; SH.members = {}; SH.seen = {}; SH.pushed = {}; SH.ready = false; }
+function sharedZones() { return STATE.zones.filter(z => z.sharedId); }
+function zoneForShared(sid) { return STATE.zones.find(z => z.sharedId === sid) || null; }
+function sharedCatId(sid) { return 'sc-' + sid; }
+function isSharedCat(catId) { return String(catId || '').indexOf('sc-') === 0; }
+async function shMissing(r) {
+  if (!r || r.status !== 404) return false;
+  let sig = '';
+  try { const j = await r.json(); sig = String((j && (j.code || '')) + ' ' + (j && j.message || '')); } catch (e) { /* not JSON */ }
+  if (/PGRST20|schema cache|does not exist/i.test(sig)) SH.missing = true;
+  return true;
+}
+// Everything about a shared cluster that belongs to everyone in it.
+function sharedPayload(z) {
+  if (!z) return null;
+  const cat = catById(z.catId) || { name: 'Shared', color: PAL[0].id };
+  return {
+    name: cat.name, color: cat.color, w: Math.round(z.w), h: Math.round(z.h),
+    tasks: STATE.notes.filter(n => n.sharedId === z.sharedId).map(n => ({
+      id: n.id, title: n.title || '', desc: n.desc || '',
+      images: n.images || null, steps: n.steps || [],
+      completedAt: n.completedAt || null, archived: !!n.archived,
+      createdAt: n.createdAt || Date.now(),
+      rx: Math.round(n.x - z.x), ry: Math.round(n.y - z.y),
+    })),
+  };
+}
+// Somewhere clear of everything already on the board, for a cluster arriving for the first time.
+function freeSpotForShared() {
+  let maxX = 40, minY = 40;
+  for (const z of STATE.zones) maxX = Math.max(maxX, z.x + z.w);
+  for (const n of STATE.notes) if (!n.archived) maxX = Math.max(maxX, n.x + NOTE_W);
+  return { x: maxX + 80, y: minY };
+}
+function mergeSharedRow(row) {
+  const d = row.data || {};
+  const catId = sharedCatId(row.id);
+  let cat = STATE.cats.find(c => c.id === catId);
+  if (!cat) { cat = { id: catId, name: d.name || 'Shared', color: d.color || PAL[0].id }; STATE.cats.push(cat); }
+  else { if (d.name) cat.name = d.name; if (d.color) cat.color = d.color; }
+  let z = zoneForShared(row.id);
+  if (!z) {
+    const spot = freeSpotForShared();
+    z = { id: uid(), catId, sharedId: row.id, x: spot.x, y: spot.y, w: d.w || 320, h: d.h || 240 };
+    STATE.zones.push(z);
+  } else { z.catId = catId; if (d.w) z.w = d.w; if (d.h) z.h = d.h; }
+  const remote = Array.isArray(d.tasks) ? d.tasks : [];
+  const keep = {};
+  for (const t of remote) {
+    if (!t || !t.id) continue;
+    keep[t.id] = true;
+    let n = noteById(t.id);
+    if (!n) { n = { id: t.id, x: 0, y: 0, z: ++STATE.zTop, steps: [] }; STATE.notes.push(n); }
+    const mine = n.todayAt;                     // today's list is personal, never shared
+    n.title = t.title || ''; n.desc = t.desc || '';
+    if (t.images) n.images = t.images; else delete n.images;
+    n.steps = Array.isArray(t.steps) ? t.steps : [];
+    n.completedAt = t.completedAt || null;
+    n.archived = !!t.archived;
+    n.createdAt = t.createdAt || Date.now();
+    n.catId = catId; n.sharedId = row.id;
+    n.x = z.x + (Number(t.rx) || 0); n.y = z.y + (Number(t.ry) || 0);
+    if (mine) n.todayAt = mine; else delete n.todayAt;
+  }
+  STATE.notes = STATE.notes.filter(n => n.sharedId !== row.id || keep[n.id]);
+}
+// The cluster is gone for us: the owner binned it, or we were shown out. Its tasks go with
+// it, since they were never ours to keep.
+function dropSharedLocally(sid) {
+  STATE.zones = STATE.zones.filter(z => z.sharedId !== sid);
+  STATE.notes = STATE.notes.filter(n => n.sharedId !== sid);
+  STATE.cats = STATE.cats.filter(c => c.id !== sharedCatId(sid));
+  delete SH.rows[sid]; delete SH.members[sid]; delete SH.seen[sid]; delete SH.pushed[sid];
+}
+async function pushSharedRow(sid) {
+  const z = zoneForShared(sid);
+  if (!z || SH.missing || !SB.access) return false;
+  const payload = sharedPayload(z);
+  const r = await sbFetch('/rest/v1/dayu_shared_clusters?id=eq.' + encodeURIComponent(sid), {
+    method: 'PATCH', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ data: payload, updated_at: new Date().toISOString() }),
+  }).catch(() => null);
+  if (!r || !r.ok) return false;
+  SH.pushed[sid] = JSON.stringify(payload);
+  SH.seen[sid] = Date.now();
+  return true;
+}
+async function syncShared() {
+  if (SH.missing || !SB.access || SH.syncing) return false;
+  SH.syncing = true;
+  let touched = false;
+  try {
+    const [cr, mr] = await Promise.all([
+      sbFetch('/rest/v1/dayu_shared_clusters?select=id,owner,data,updated_at'),
+      sbFetch('/rest/v1/dayu_cluster_members?select=cluster_id,user_id'),
+    ]);
+    if (await shMissing(cr) || await shMissing(mr)) return false;
+    if (!cr.ok || !mr.ok) return false;
+    const rows = await cr.json();
+    const mem = await mr.json();
+    SH.members = {};
+    for (const m of mem) (SH.members[m.cluster_id] = SH.members[m.cluster_id] || []).push(m.user_id);
+    const live = {};
+    for (const row of rows) {
+      live[row.id] = true;
+      SH.rows[row.id] = row;
+      const remoteTs = Date.parse(row.updated_at) || 0;
+      const z = zoneForShared(row.id);
+      if (!z || remoteTs > (SH.seen[row.id] || 0)) {
+        mergeSharedRow(row);
+        SH.seen[row.id] = remoteTs;
+        SH.pushed[row.id] = JSON.stringify(sharedPayload(zoneForShared(row.id)));
+        touched = true;
+      } else {
+        const flat = JSON.stringify(sharedPayload(z));
+        if (flat !== SH.pushed[row.id]) await pushSharedRow(row.id);
+      }
+    }
+    for (const z of sharedZones().slice()) {
+      if (!live[z.sharedId]) { dropSharedLocally(z.sharedId); touched = true; }
+    }
+    SH.ready = true;
+  } catch (e) {
+    return false;
+  } finally {
+    SH.syncing = false;
+  }
+  if (touched) { storeSet(STORE_KEY, JSON.stringify(STATE)); renderAll(); }
+  return true;
+}
+// Turn one of my own clusters into a shared one, and put a friend in it.
+async function shareCluster(z, friendId) {
+  if (!SB.access) return { ok: false, message: 'Sign in first.' };
+  if (SH.missing) return { ok: false, message: 'Shared clusters are not switched on for this copy of Dayu yet.' };
+  let sid = z.sharedId;
+  if (!sid) {
+    const cat = catById(z.catId) || { name: 'Shared', color: PAL[0].id };
+    const body = { owner: myId(), data: { name: cat.name, color: cat.color, w: Math.round(z.w), h: Math.round(z.h), tasks: [] } };
+    const r = await sbFetch('/rest/v1/dayu_shared_clusters', {
+      method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify([body]),
+    }).catch(() => null);
+    if (!r) return { ok: false, message: 'No connection right now.' };
+    if (await shMissing(r)) return { ok: false, message: 'Shared clusters are not switched on for this copy of Dayu yet.' };
+    if (!r.ok) return { ok: false, message: 'Could not share that cluster (HTTP ' + r.status + ').' };
+    const made = (await r.json().catch(() => []))[0];
+    if (!made) return { ok: false, message: 'Could not share that cluster.' };
+    sid = made.id;
+    // The tasks already sitting inside it come along, and the cluster keeps its own colour.
+    const inside = notesInsideZone(z).map(r2 => r2.n);
+    const catId = sharedCatId(sid);
+    const old = catById(z.catId);
+    STATE.cats.push({ id: catId, name: old ? old.name : 'Shared', color: old ? old.color : PAL[0].id });
+    z.sharedId = sid; z.catId = catId;
+    for (const n of inside) { n.sharedId = sid; n.catId = catId; }
+    await sbFetch('/rest/v1/dayu_cluster_members', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify([{ cluster_id: sid, user_id: myId() }]),
+    }).catch(() => null);
+    save();
+    await pushSharedRow(sid);
+  }
+  if (friendId) {
+    const r = await sbFetch('/rest/v1/dayu_cluster_members', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify([{ cluster_id: sid, user_id: friendId }]),
+    }).catch(() => null);
+    if (!r) return { ok: false, message: 'No connection right now.' };
+    if (r.status === 409) return { ok: true };                     // already in it
+    if (!r.ok) return { ok: false, message: 'Could not add them (HTTP ' + r.status + ').' };
+  }
+  await syncShared();
+  return { ok: true, sharedId: sid };
+}
+// Only the owner can do this, and it takes the cluster away from everyone in it.
+async function deleteSharedRow(sid) {
+  if (!SB.access) return false;
+  const r = await sbFetch('/rest/v1/dayu_shared_clusters?id=eq.' + encodeURIComponent(sid), {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  }).catch(() => null);
+  if (!r || !r.ok) return false;
+  dropSharedLocally(sid);
+  save(); renderAll();
+  return true;
+}
+async function unshareMember(sid, userId) {
+  if (!SB.access) return { ok: false };
+  const r = await sbFetch('/rest/v1/dayu_cluster_members?cluster_id=eq.' + encodeURIComponent(sid) + '&user_id=eq.' + encodeURIComponent(userId), {
+    method: 'DELETE', headers: { Prefer: 'return=minimal' },
+  }).catch(() => null);
+  if (!r || !r.ok) return { ok: false };
+  if (userId === myId()) { dropSharedLocally(sid); save(); renderAll(); }
+  else await syncShared();
+  return { ok: true };
+}
+function sharedOwner(sid) { const row = SH.rows[sid]; return row ? row.owner : ''; }
+function iOwnShared(sid) { return sharedOwner(sid) === myId(); }
+function sharedMemberIds(sid) { return (SH.members[sid] || []).filter(u => u !== sharedOwner(sid)); }
 
 /* ---------- welcome gate for first-time visitors ---------- */
 const WELCOME_KEY = 'dayu-welcomed';
@@ -2106,6 +2358,7 @@ function buildZone(z) {
       h('span.dot', { style: { width: '8px', height: '8px', borderRadius: '50%', background: pal.deep, flex: '0 0 auto' } }),
       h('span', {}, cat ? cat.name : '?'),
       h('span.zcount', {}, String(notesInCat(z.catId).length)),
+      z.sharedId ? h('span.zshared', { title: 'Shared with ' + (sharedMemberIds(z.sharedId).map(displayName).join(', ') || 'a friend') }, '👥') : null,
       h('button.zdel', { title: 'Remove this area (tasks keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
     h('div.zresize', { title: 'Resize' }));
 
@@ -2205,8 +2458,20 @@ function startZoneDrag(z, e, grabEl, onClick) {
   window.addEventListener('pointercancel', cancel);
 }
 function removeZone(id) {
+  const z = STATE.zones.find(x => x.id === id);
+  // A shared cluster is not just an outline on this screen: removing it has to mean either
+  // leaving it or, for whoever made it, taking it away from everyone.
+  if (z && z.sharedId) {
+    const sid = z.sharedId;
+    if (iOwnShared(sid)) {
+      deleteSharedRow(sid).then(ok => toast(ok ? 'Shared cluster removed for everyone in it' : 'Could not remove that just now'));
+    } else {
+      unshareMember(sid, myId()).then(r => toast(r.ok ? 'You have left that cluster' : 'Could not leave just now'));
+    }
+    return;
+  }
   undoableAction('Cluster area removed. Tasks kept their category', () => {
-    STATE.zones = STATE.zones.filter(z => z.id !== id);
+    STATE.zones = STATE.zones.filter(x => x.id !== id);
   });
 }
 // generic incremental drag helper: cb gets deltas since last move, in logical (unzoomed) px
@@ -2344,6 +2609,14 @@ function dropAssign(n, el, ev) {
   const before = n.catId;
   if (z) n.catId = z.catId;
   else if (n.catId && STATE.zones.some(zz => zz.catId === n.catId)) n.catId = null; // pulled out of its home area
+  // Dropping a task into a shared cluster hands it to everyone in that cluster; dragging it
+  // out takes it back, so the flag has to follow the outline it actually sits in.
+  const nowShared = z && z.sharedId ? z.sharedId : null;
+  if ((n.sharedId || null) !== nowShared) {
+    if (nowShared) n.sharedId = nowShared; else delete n.sharedId;
+    if (before !== n.catId && !nowShared) { /* the chip below already says where it went */ }
+    schedulePush();
+  }
   if (n.catId !== before) {
     const cat = catById(n.catId);
     dropChip(ev.clientX, ev.clientY, cat ? '→ ' + cat.name : 'No category');
@@ -2687,6 +2960,56 @@ function wireCanvas() {
 }
 
 function closeZonePop() { $$('.zonepop').forEach(p => p.remove()); }
+// Who else is working on this cluster, and the way to invite someone or step out of it.
+function sharePanel(z) {
+  const box = h('div.sharebox');
+  const paint = () => {
+    box.innerHTML = '';
+    if (!signedIn()) { box.append(h('div.sharenote', {}, 'Sign in to share a cluster with a friend.')); return; }
+    if (SH.missing) { box.append(h('div.sharenote', {}, 'Sharing needs a one-time database step. See SETUP.md.')); return; }
+    box.append(h('span.label', {}, 'Shared with'));
+    const sid = z.sharedId;
+    const mine = !sid || iOwnShared(sid);
+    if (sid) {
+      const ids = sharedMemberIds(sid);
+      if (!ids.length) box.append(h('div.sharenote', {}, 'Nobody yet. Pick a friend below.'));
+      for (const uid2 of ids) {
+        box.append(h('div.sharerow', {}, avatarEl(uid2, 20), h('span.sharename', {}, displayName(uid2)),
+          mine ? h('button.xbtn', { type: 'button', title: 'Take them out of this cluster', onclick: async () => {
+            const r = await unshareMember(sid, uid2);
+            if (!r.ok) toast('Could not do that just now'); else { paint(); toast('Removed from the cluster'); }
+          } }, '✕') : null));
+      }
+      if (!mine) {
+        box.append(h('div.sharenote', {}, displayName(sharedOwner(sid)) + ' shared this with you.'),
+          h('button.btn.ghost.small', { type: 'button', onclick: async () => {
+            closeZonePop();
+            const r = await unshareMember(sid, myId());
+            toast(r.ok ? 'You have left that cluster' : 'Could not leave just now');
+          } }, 'Leave this cluster'));
+        return;
+      }
+    }
+    const friends = friendIds().filter(f => !sid || sharedMemberIds(sid).indexOf(f) < 0);
+    if (!friends.length) {
+      box.append(h('div.sharenote', {}, sid ? 'All your friends are already in it.' : 'Add a friend on the Goals page first, then share this with them.'));
+      return;
+    }
+    const sel = h('select.input', { style: { flex: '1', minWidth: '0' } }, friends.map(f => h('option', { value: f }, displayName(f))));
+    const btn = h('button.btn.small', { type: 'button' }, 'Share');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; btn.textContent = 'Sharing…';
+      const r = await shareCluster(z, sel.value);
+      btn.disabled = false; btn.textContent = 'Share';
+      if (!r.ok) { toast(r.message || 'Could not share that cluster'); return; }
+      toast('Shared with ' + displayName(sel.value));
+      paint();
+    });
+    box.append(h('div.sharepick', {}, sel, btn));
+  };
+  paint();
+  return box;
+}
 let zonePopWired = false;
 // One popover, used both to name a new cluster and to edit an existing one. It sits on the
 // body at a fixed spot rather than on the canvas plane, because on the plane it scaled with
@@ -2718,6 +3041,7 @@ function zonePopover(o) {
   const pop = h('div.zonepop', { role: 'dialog', 'aria-label': o.title },
     h('div.label', {}, o.title),
     nameIn, dots,
+    o.share ? sharePanel(o.share) : null,
     h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'flex-end' } },
       h('button.btn.ghost.small', { type: 'button', onclick: closeZonePop }, 'Cancel'),
       h('button.btn.primary.small', { type: 'button', onclick: submit }, o.confirm)));
@@ -2773,7 +3097,7 @@ function zoneEditPopover(z, atX, atY) {
   if (!cat) return;
   zonePopover({
     title: 'Edit cluster', confirm: 'Save', name: cat.name, color: cat.color,
-    atX, atY,
+    atX, atY, share: z,
     onSubmit: (nm, color) => {
       // Look the category up again: a sync may have replaced the board while this was open.
       const live = STATE.cats.find(c => c.id === cat.id);
@@ -2844,6 +3168,39 @@ function openNote(id) {
   });
   body.append(h('div.srow', {}, bigchk, ttl));
 
+  // A pasted picture is shrunk before it is kept. The whole board travels as one JSON
+  // document to this browser's storage and to the account, so a full-size screenshot would
+  // bloat every save from then on; a long edge of 1100px is plenty to read a screenshot by.
+  const IMG_MAX_EDGE = 1100;
+  const IMG_MAX_BYTES = 900 * 1024;
+  function shrinkImage(file, ok, fail) {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, IMG_MAX_EDGE / Math.max(im.width, im.height));
+      const w = Math.max(1, Math.round(im.width * scale)), ht = Math.max(1, Math.round(im.height * scale));
+      const cv = document.createElement('canvas');
+      cv.width = w; cv.height = ht;
+      cv.getContext('2d').drawImage(im, 0, 0, w, ht);
+      let data = '';
+      // WebP keeps transparency, which a screenshot of a rounded window needs; JPEG is the
+      // fallback for anything that cannot write it.
+      try { data = cv.toDataURL('image/webp', 0.8); } catch (e) { data = ''; }
+      if (data.indexOf('data:image/webp') !== 0) { try { data = cv.toDataURL('image/jpeg', 0.82); } catch (e) { data = ''; } }
+      if (!data) { fail('That picture could not be read.'); return; }
+      if (data.length > IMG_MAX_BYTES) { fail('That picture is too big to keep on the board, even shrunk.'); return; }
+      ok(data);
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); fail('That did not look like a picture Dayu can read.'); };
+    im.src = url;
+  }
+  // Whatever is no longer referenced in the text is no longer worth carrying around.
+  function pruneImages() {
+    if (!n.images) return;
+    for (const id of Object.keys(n.images)) if ((n.desc || '').indexOf('img:' + id) < 0) delete n.images[id];
+    if (!Object.keys(n.images).length) delete n.images;
+  }
   // The description is Markdown. It reads as formatted text and turns back into the plain
   // source the moment you click into it, so what you edit is always exactly what you wrote.
   const descWrap = h('div.descwrap');
@@ -2851,20 +3208,47 @@ function openNote(id) {
   const paintDesc = editing => {
     descWrap.innerHTML = '';
     if (editing) {
-      const ta = h('textarea.desc', { rows: 1, placeholder: 'Add a description. Markdown works: **bold**, # heading, - list', value: n.desc || '' });
+      const ta = h('textarea.desc', { rows: 1, placeholder: 'Add a description. Markdown works, and you can paste a picture straight in', value: n.desc || '' });
       ta.addEventListener('input', () => { n.desc = ta.value; grow(ta); save(); });
       ta.addEventListener('blur', () => paintDesc(false));
       ta.addEventListener('keydown', ev => { if (ev.key === 'Escape') ta.blur(); ev.stopPropagation(); });
+      // Paste a picture and it is kept with the task, written into the text as a short
+      // reference so the source stays readable. Ordinary text pastes are left alone.
+      ta.addEventListener('paste', ev => {
+        const items = Array.from((ev.clipboardData && ev.clipboardData.items) || []);
+        const it = items.find(x => x.kind === 'file' && x.type && x.type.indexOf('image/') === 0);
+        if (!it) return;
+        const file = it.getAsFile();
+        if (!file) return;
+        ev.preventDefault();
+        shrinkImage(file, data => {
+          if (!n.images) n.images = {};
+          const id = 'p' + Math.random().toString(36).slice(2, 10);
+          n.images[id] = data;
+          const snippet = '![pasted image](img:' + id + ')';
+          const a = ta.selectionStart, b = ta.selectionEnd;
+          const before = ta.value.slice(0, a), after = ta.value.slice(b);
+          const lead = before && !/\n$/.test(before) ? '\n\n' : '';
+          ta.value = before + lead + snippet + '\n' + after;
+          n.desc = ta.value;
+          save();
+          grow(ta);
+          const caret = (before + lead + snippet + '\n').length;
+          ta.setSelectionRange(caret, caret);
+          toast('Picture added. Click away to see it');
+        }, msg => toast(msg));
+      });
       descWrap.append(ta);
       grow(ta);
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
       return;
     }
+    pruneImages();
     if ((n.desc || '').trim()) {
       const view = h('div.mdbody', { title: 'Click to edit' });
-      view.innerHTML = mdToHtml(n.desc);
-      view.addEventListener('click', ev => { if (!ev.target.closest('a')) paintDesc(true); });
+      view.innerHTML = mdToHtml(n.desc, n.images);
+      view.addEventListener('click', ev => { if (!ev.target.closest('a, img')) paintDesc(true); });
       descWrap.append(view);
       return;
     }
@@ -3084,10 +3468,10 @@ function dayKeyOffset(days) {
   const d = new Date();
   return dayKey(new Date(d.getFullYear(), d.getMonth(), d.getDate() + days).getTime());
 }
-// Today first, then backwards. The sheet reads left to right from today into the past.
-function recentDaysKeys(n) {
+// Oldest first, ending on today: dates increase left to right, the way a calendar reads.
+function ascendingDaysKeys(n) {
   const out = [];
-  for (let i = 0; i < n; i++) out.push(dayKeyOffset(-i));
+  for (let i = n - 1; i >= 0; i--) out.push(dayKeyOffset(-i));
   return out;
 }
 // This calendar week, Monday through Sunday.
@@ -3119,8 +3503,8 @@ function toggleHabit(hb, dk) {
 }
 
 /* ---------- the sheet (goals page) ---------- */
-// Three months of history, newest first: today is the column you land on, and the rest
-// scrolls away to the right.
+// Three months of history running left to right into today, which is the column the sheet
+// opens scrolled to. Older days are back to the left.
 const SHEET_DAYS = 90;
 function renderHabitSheet() {
   const box = h('div');
@@ -3130,7 +3514,7 @@ function renderHabitSheet() {
     h('span.label', {}, 'Daily goals'),
     habs.length ? h('span.todaychip', {}, 'Today: ' + done + ' of ' + habs.length) : null));
 
-  const keys = recentDaysKeys(SHEET_DAYS);
+  const keys = ascendingDaysKeys(SHEET_DAYS);
   const tk = todayKey();
   const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -3190,9 +3574,13 @@ function renderHabitSheet() {
   });
   tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
-  box.append(h('div.hwrap', {}, h('table.htable', {}, thead, tbody)));
+  const wrap = h('div.hwrap', {}, h('table.htable', {}, thead, tbody));
+  box.append(wrap);
+  // Today is the last column, so the sheet opens at the right-hand end. This runs after the
+  // page has appended the sheet, since a detached element has no width to scroll.
+  setTimeout(() => { if (wrap.isConnected) wrap.scrollLeft = wrap.scrollWidth; }, 0);
   if (habs.length) {
-    box.append(h('div.hscrollnote', {}, 'Today is on the left. Scroll sideways to look back through the days.'));
+    box.append(h('div.hscrollnote', {}, 'Today is on the right. Scroll back to the left to look through earlier days.'));
   } else {
     box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
   }
@@ -3632,10 +4020,14 @@ function updateFriendBadge() {
   b.textContent = n > 99 ? '99+' : String(n);
 }
 function repaintFriends() { if (friendsMount && friendsMount.isConnected) paintFriends(friendsMount); }
-// The poll calls this: never repaint while the person's cursor is inside the section.
+// The poll calls this. It used to skip whenever anything in the section held focus, which
+// a button does after you click it: pressing "Add a friend" once left focus parked there
+// and stopped every later refresh. Only a half-typed entry is worth protecting, and the
+// section has none, so the guard now looks for one specifically.
 function repaintFriendsIfSafe() {
   if (!friendsMount || !friendsMount.isConnected) return;
-  if (friendsMount.contains(document.activeElement)) return;
+  const a = document.activeElement;
+  if (a && friendsMount.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
   paintFriends(friendsMount);
 }
 function renderFriendsSection() {
@@ -3681,6 +4073,30 @@ function avatarEl(userId, size) {
   }
   return el;
 }
+// Fetch everything again on demand, for when a friend says they have just ticked something
+// off and you would rather not wait for the next round of polling.
+function refreshFriendsBtn() {
+  const btn = h('button.btn.ghost.small.frefresh', { title: 'Check for the latest from your friends' },
+    h('span.ric', { 'aria-hidden': 'true' }, '↻'), h('span', {}, 'Refresh'));
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.classList.add('spinning');
+    $('span:last-child', btn).textContent = 'Checking…';
+    pushProgress();                       // send mine while I am asking for theirs
+    const ok = await loadFriends(true);
+    if (ok) {
+      repaintFriends();                   // force: the press itself put focus on this button
+      toast('Friends are up to date');
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('spinning');
+      $('span:last-child', btn).textContent = 'Refresh';
+      toast(FR.missing ? 'Friends are not switched on for this copy of Dayu yet' : 'Could not reach your friends just now');
+    }
+  });
+  return btn;
+}
 function paintFriends(box) {
   box.innerHTML = '';
   const head = h('div.fhead', {}, h('span.label', {}, 'Friends'));
@@ -3696,7 +4112,7 @@ function paintFriends(box) {
     box.append(h('div.empty', {}, 'Friends are not switched on for this copy of Dayu yet: its database is missing the friends tables. The owner runs the SQL in SETUP.md once, and this section comes alive.'));
     return;
   }
-  head.append(h('button.btn.small', { onclick: openFriendPicker }, '＋ Add a friend'));
+  head.append(refreshFriendsBtn(), h('button.btn.small', { onclick: openFriendPicker }, '＋ Add a friend'));
   if (!FR.ready) {
     box.append(h('div.empty', {}, FR.error ? 'Could not reach the friends list (' + FR.error + '). It keeps retrying on its own.' : 'Looking up your friends…'));
     return;
