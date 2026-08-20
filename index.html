@@ -600,6 +600,10 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .htable .htools button{width:20px;height:20px;border-radius:5px;color:var(--ink3);font-size:11px;line-height:1}
 .htable .htools button:hover{background:var(--accent-soft);color:var(--ink)}
 .htable .todaycol{background:var(--accent-soft)}
+/* days that have not happened yet: there to be seen, not to be marked */
+.htable td.futurecol,.htable th.futurecol{opacity:.4}
+.htable td.futurecol .hcell{cursor:default}
+.htable td.futurecol .hcell:hover{background:none}
 .hcell{width:36px;height:36px;padding:0;border-radius:0;display:inline-flex;align-items:center;justify-content:center;transition:background .1s ease}
 .hcell:hover{background:var(--accent-soft)}
 .hcell.c-green{background:var(--good)}
@@ -1916,8 +1920,12 @@ async function friendsPollTick() {
     if (await loadFriends()) repaintFriendsIfSafe();
   }
   // Someone else may be moving things around inside a shared cluster right now, so the
-  // canvas keeps up with it on the same beat.
-  if (sharedZones().length || FR.ticks % 3 === 0) await syncShared();
+  // canvas keeps up with it on the same beat. The "not set up" verdict is re-tested every
+  // few minutes: the database can answer "no such table" for a table that does exist while
+  // it reloads its schema cache, and one unlucky reply should not switch sharing off for
+  // the rest of the session.
+  if (SH.missing) { if (FR.ticks % 15 === 0) { SH.missing = false; await syncShared(); } }
+  else if (sharedZones().length || FR.ticks % 3 === 0) await syncShared();
 }
 function initFriends() {
   if (signedIn()) { pushProfile(); loadFriends().then(ok => { if (ok) repaintFriendsIfSafe(); }); }
@@ -3503,9 +3511,15 @@ function toggleHabit(hb, dk) {
 }
 
 /* ---------- the sheet (goals page) ---------- */
-// Three months of history running left to right into today, which is the column the sheet
-// opens scrolled to. Older days are back to the left.
-const SHEET_DAYS = 90;
+// Dates run left to right. The sheet opens with today as the first column you see, so the
+// week ahead is in front of you and the days behind are a scroll back to the left.
+const SHEET_PAST = 90, SHEET_AHEAD = 30;
+const SHEET_DAYS = SHEET_PAST + 1 + SHEET_AHEAD;
+function sheetDayKeys() {
+  const out = [];
+  for (let i = -SHEET_PAST; i <= SHEET_AHEAD; i++) out.push(dayKeyOffset(i));
+  return out;
+}
 function renderHabitSheet() {
   const box = h('div');
   const habs = activeHabits();
@@ -3514,7 +3528,7 @@ function renderHabitSheet() {
     h('span.label', {}, 'Daily goals'),
     habs.length ? h('span.todaychip', {}, 'Today: ' + done + ' of ' + habs.length) : null));
 
-  const keys = ascendingDaysKeys(SHEET_DAYS);
+  const keys = sheetDayKeys();
   const tk = todayKey();
   const letters = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
@@ -3522,7 +3536,8 @@ function renderHabitSheet() {
     h('th.hname', {}, ''),
     keys.map(k => {
       const d = new Date(k + 'T12:00');
-      return h('th' + (k === tk ? '.todaycol' : ''), {}, letters[d.getDay()], h('span.dnum', {}, String(d.getDate())));
+      const cls = k === tk ? '.todaycol' : (k > tk ? '.futurecol' : '');
+      return h('th' + cls, {}, letters[d.getDay()], h('span.dnum', {}, String(d.getDate())));
     })));
 
   const tbody = h('tbody');
@@ -3535,7 +3550,7 @@ function renderHabitSheet() {
         const commit = () => { hb.name = inp.value.trim() || hb.name; save(); renderGoals(); };
         inp.addEventListener('blur', commit);
         inp.addEventListener('keydown', e => { if (imeBusy(e)) return; if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = hb.name; inp.blur(); } });
-        nameTd.innerHTML = ''; nameTd.append(inp); inp.focus(); inp.select();
+        nameTd.innerHTML = ''; nameTd.append(inp); inp.focus({ preventScroll: true }); inp.select();
       } }, '✎'),
       h('button', { title: 'Retire: stop tracking, keep its history on the Dashboard', onclick: () => {
         undoableAction('“' + hb.name + '” retired. Its history stays on the Dashboard', () => { hb.archivedAt = Date.now(); });
@@ -3549,16 +3564,19 @@ function renderHabitSheet() {
       undoableAction('“' + hb.name + '” deleted', () => { STATE.habits = STATE.habits.filter(x => x.id !== hb.id); });
     });
     for (const k of keys) {
-      const cellTitle = () => hb.name + ' · ' + k + (hb.days[k] ? ' (' + cellLabel(hb.days[k]) + ')' : '');
-      const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: cellTitle() });
-      cell.addEventListener('click', () => {
+      // A day that has not happened yet is shown but not markable, the same as in the
+      // archive's history: a tick there would count towards a score for a day nobody lived.
+      const future = k > tk;
+      const cellTitle = () => hb.name + ' · ' + k + (future ? ' (not yet)' : (hb.days[k] ? ' (' + cellLabel(hb.days[k]) + ')' : ''));
+      const cell = h('button.hcell' + (hb.days[k] ? '.c-' + hb.days[k] : ''), { title: cellTitle(), disabled: future });
+      if (!future) cell.addEventListener('click', () => {
         toggleHabit(hb, k);
         cell.className = 'hcell' + (hb.days[k] ? ' c-' + hb.days[k] : '');
         cell.title = cellTitle();
         const chip = $('.todaychip', box);
         if (chip) chip.textContent = 'Today: ' + activeHabits().filter(habitCheckedToday).length + ' of ' + activeHabits().length;
       });
-      tr.append(h('td' + (k === tk ? '.todaycol' : ''), {}, cell));
+      tr.append(h('td' + (k === tk ? '.todaycol' : (future ? '.futurecol' : '')), {}, cell));
     }
     tbody.append(tr);
   }
@@ -3569,18 +3587,30 @@ function renderHabitSheet() {
       const maxOrder = STATE.habits.reduce((m, x) => Math.max(m, x.order || 0), 0);
       STATE.habits.push({ id: uid(), name: addInp.value.trim(), order: maxOrder + 1, createdAt: Date.now(), archivedAt: null, days: {} });
       save(); renderGoals(); renderMeters();
-      setTimeout(() => { const i = $('.haddrow input'); if (i) i.focus(); }, 0);
+      // preventScroll, or focusing this box (which lives in the sticky left column) drags
+      // the sheet back to its far left and undoes the scroll that parks today on the edge.
+      setTimeout(() => { const i = $('.haddrow input'); if (i) i.focus({ preventScroll: true }); }, 0);
     }
   });
   tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
   const wrap = h('div.hwrap', {}, h('table.htable', {}, thead, tbody));
   box.append(wrap);
-  // Today is the last column, so the sheet opens at the right-hand end. This runs after the
-  // page has appended the sheet, since a detached element has no width to scroll.
-  setTimeout(() => { if (wrap.isConnected) wrap.scrollLeft = wrap.scrollWidth; }, 0);
+  // Park today against the left edge of the scrolling area, just past the sticky name
+  // column, so the days ahead are what you see first. Measured rather than counted, since
+  // the name column's width depends on the longest goal name. It runs after the page has
+  // appended the sheet, because a detached element has no width to scroll.
+  setTimeout(() => {
+    if (!wrap.isConnected) return;
+    const th = wrap.querySelector('thead th.todaycol');
+    const nameTh = wrap.querySelector('thead th.hname');
+    if (!th) return;
+    const gap = th.getBoundingClientRect().left - wrap.getBoundingClientRect().left
+      - (nameTh ? nameTh.getBoundingClientRect().width : 0);
+    wrap.scrollLeft += gap;
+  }, 0);
   if (habs.length) {
-    box.append(h('div.hscrollnote', {}, 'Today is on the right. Scroll back to the left to look through earlier days.'));
+    box.append(h('div.hscrollnote', {}, 'Today is the first column. The days ahead are to the right, and earlier days are back to the left.'));
   } else {
     box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
   }
