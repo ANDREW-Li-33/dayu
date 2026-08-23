@@ -339,6 +339,16 @@ main{flex:1;min-height:0;position:relative}
 }
 .rdel{flex:0 0 auto;width:22px;height:22px;border-radius:7px;color:var(--ink3);font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
 .rdel:hover{color:var(--danger);background:var(--danger-soft)}
+/* the one mark that says whether this routine is shared, and opens the panel for it */
+.rshare{flex:0 0 auto;width:22px;height:22px;border-radius:7px;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;opacity:.3;filter:grayscale(1)}
+.rhead:hover .rshare{opacity:.7}
+.rshare:hover{opacity:1;filter:none;background:var(--accent-soft)}
+.rshare.on{opacity:1;filter:none}
+.rsharepop{
+  position:fixed;z-index:1450;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;box-shadow:var(--shadow-big);padding:12px;width:280px;max-width:calc(100vw - 24px);
+}
+.rsharepop .sharebox{border-top:none;padding-top:0}
 .rbody{flex:1;min-height:0;overflow-y:auto;padding:11px 14px 13px}
 .rbody .mdbody{margin:0;padding:0;font-size:13px}
 .rbody .descadd{font-size:12.5px}
@@ -2118,7 +2128,7 @@ async function friendsPollTick() {
   // it reloads its schema cache, and one unlucky reply should not switch sharing off for
   // the rest of the session.
   if (SH.missing) { if (FR.ticks % 15 === 0) { SH.missing = false; await syncShared(); } }
-  else if (sharedZones().length || FR.ticks % 3 === 0) await syncShared();
+  else if (sharedZones().length || sharedRoutines().length || FR.ticks % 3 === 0) await syncShared();
 }
 function initFriends() {
   if (signedIn()) { pushProfile(); loadFriends().then(ok => { if (ok) repaintFriendsIfSafe(); }); }
@@ -2167,7 +2177,81 @@ function freeSpotForShared() {
   for (const n of STATE.notes) if (!n.archived) maxX = Math.max(maxX, n.x + NOTE_W);
   return { x: maxX + 80, y: minY };
 }
+/* ---------- shared routines ---------- */
+// A shared routine rides in the same two tables as a shared cluster. The row carries what
+// kind of thing it is inside its own data, so nothing new has to be created in the database
+// and a row written by an older copy of Dayu, which has no `kind` at all, is still a cluster.
+function sharedRoutines() { return STATE.routines.filter(r => r.sharedId); }
+function routineForShared(sid) { return STATE.routines.find(r => r.sharedId === sid) || null; }
+// The writing is shared; where you keep it and how big you make it are yours, the same way a
+// shared cluster sits wherever each person put it.
+function sharedRoutinePayload(r) {
+  if (!r) return null;
+  return { kind: 'routine', title: r.title || '', body: r.body || '' };
+}
+// Whichever local thing carries this id, flattened for the wire.
+function sharedPayloadFor(sid) {
+  const z = zoneForShared(sid);
+  if (z) return sharedPayload(z);
+  const r = routineForShared(sid);
+  return r ? sharedRoutinePayload(r) : null;
+}
+// Somewhere clear of the routines already on the board, for one arriving for the first time.
+function freeSpotForRoutine() {
+  let maxX = 40;
+  for (const r of STATE.routines) maxX = Math.max(maxX, r.x + r.w);
+  return { x: maxX + 60, y: 60 };
+}
+function mergeSharedRoutine(row) {
+  const d = row.data || {};
+  let r = routineForShared(row.id);
+  if (!r) {
+    const spot = freeSpotForRoutine();
+    r = { id: uid(), sharedId: row.id, x: spot.x, y: spot.y, w: 340, h: 280, z: ++STATE.zTop, createdAt: Date.now() };
+    STATE.routines.push(r);
+  }
+  r.title = typeof d.title === 'string' ? d.title : '';
+  r.body = typeof d.body === 'string' ? d.body : '';
+}
+// Turn one of my own routines into a shared one, and put a friend in it.
+async function shareRoutine(rt, friendId) {
+  if (!SB.access) return { ok: false, message: 'Sign in first.' };
+  if (SH.missing) return { ok: false, message: 'Sharing is not switched on for this copy of Dayu yet.' };
+  let sid = rt.sharedId;
+  if (!sid) {
+    const body = { owner: myId(), data: sharedRoutinePayload(rt) };
+    const r = await sbFetch('/rest/v1/dayu_shared_clusters', {
+      method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify([body]),
+    }).catch(() => null);
+    if (!r) return { ok: false, message: 'No connection right now.' };
+    if (await shMissing(r)) return { ok: false, message: 'Sharing is not switched on for this copy of Dayu yet.' };
+    if (!r.ok) return { ok: false, message: 'Could not share that routine (HTTP ' + r.status + ').' };
+    const made = (await r.json().catch(() => []))[0];
+    if (!made) return { ok: false, message: 'Could not share that routine.' };
+    sid = made.id;
+    rt.sharedId = sid;
+    await sbFetch('/rest/v1/dayu_cluster_members', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify([{ cluster_id: sid, user_id: myId() }]),
+    }).catch(() => null);
+    save();
+    await pushSharedRow(sid);
+  }
+  if (friendId) {
+    const r = await sbFetch('/rest/v1/dayu_cluster_members', {
+      method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify([{ cluster_id: sid, user_id: friendId }]),
+    }).catch(() => null);
+    if (!r) return { ok: false, message: 'No connection right now.' };
+    if (r.status === 409) return { ok: true, sharedId: sid };       // already in it
+    if (!r.ok) return { ok: false, message: 'Could not add them (HTTP ' + r.status + ').' };
+  }
+  await syncShared();
+  return { ok: true, sharedId: sid };
+}
 function mergeSharedRow(row) {
+  // Older rows carry no kind at all, and those were always clusters.
+  if (row.data && row.data.kind === 'routine') { mergeSharedRoutine(row); return; }
   const d = row.data || {};
   const catId = sharedCatId(row.id);
   let cat = STATE.cats.find(c => c.id === catId);
@@ -2207,13 +2291,14 @@ function mergeSharedRow(row) {
 function dropSharedLocally(sid) {
   STATE.zones = STATE.zones.filter(z => z.sharedId !== sid);
   STATE.notes = STATE.notes.filter(n => n.sharedId !== sid);
+  STATE.routines = STATE.routines.filter(r => r.sharedId !== sid);
   STATE.cats = STATE.cats.filter(c => c.id !== sharedCatId(sid));
   delete SH.rows[sid]; delete SH.members[sid]; delete SH.seen[sid]; delete SH.pushed[sid];
 }
 async function pushSharedRow(sid) {
-  const z = zoneForShared(sid);
-  if (!z || SH.missing || !SB.access) return false;
-  const payload = sharedPayload(z);
+  if (SH.missing || !SB.access) return false;
+  const payload = sharedPayloadFor(sid);
+  if (!payload) return false;
   const r = await sbFetch('/rest/v1/dayu_shared_clusters?id=eq.' + encodeURIComponent(sid), {
     method: 'PATCH', headers: { Prefer: 'return=minimal' },
     body: JSON.stringify({ data: payload, updated_at: new Date().toISOString() }),
@@ -2243,19 +2328,23 @@ async function syncShared() {
       live[row.id] = true;
       SH.rows[row.id] = row;
       const remoteTs = Date.parse(row.updated_at) || 0;
-      const z = zoneForShared(row.id);
-      if (!z || remoteTs > (SH.seen[row.id] || 0)) {
+      const mineAlready = zoneForShared(row.id) || routineForShared(row.id);
+      if (!mineAlready || remoteTs > (SH.seen[row.id] || 0)) {
         mergeSharedRow(row);
         SH.seen[row.id] = remoteTs;
-        SH.pushed[row.id] = JSON.stringify(sharedPayload(zoneForShared(row.id)));
+        SH.pushed[row.id] = JSON.stringify(sharedPayloadFor(row.id));
         touched = true;
       } else {
-        const flat = JSON.stringify(sharedPayload(z));
+        const flat = JSON.stringify(sharedPayloadFor(row.id));
         if (flat !== SH.pushed[row.id]) await pushSharedRow(row.id);
       }
     }
+    // Anything shared that is no longer in the list has been binned, or we were shown out.
     for (const z of sharedZones().slice()) {
       if (!live[z.sharedId]) { dropSharedLocally(z.sharedId); touched = true; }
+    }
+    for (const rt of sharedRoutines().slice()) {
+      if (!live[rt.sharedId]) { dropSharedLocally(rt.sharedId); touched = true; }
     }
     SH.ready = true;
   } catch (e) {
@@ -3376,33 +3465,35 @@ function wireCanvas() {
 }
 
 function closeZonePop() { $$('.zonepop').forEach(p => p.remove()); }
-// Who else is working on this cluster, and the way to invite someone or step out of it.
-function sharePanel(z) {
+// Who else is working on this, and the way to invite someone or step out of it. The same
+// panel serves a cluster and a routine: they differ only in the noun, in what sharing one
+// actually calls, and in which popover has to close when you leave.
+function shareBox(cfg) {
   const box = h('div.sharebox');
   const paint = () => {
     box.innerHTML = '';
-    if (!signedIn()) { box.append(h('div.sharenote', {}, 'Sign in to share a cluster with a friend.')); return; }
+    if (!signedIn()) { box.append(h('div.sharenote', {}, 'Sign in to share a ' + cfg.noun + ' with a friend.')); return; }
     if (SH.missing) { box.append(h('div.sharenote', {}, 'Sharing needs a one-time database step. See SETUP.md.')); return; }
     box.append(h('span.label', {}, 'Shared with'));
-    const sid = z.sharedId;
+    const sid = cfg.sid();
     const mine = !sid || iOwnShared(sid);
     if (sid) {
       const ids = sharedMemberIds(sid);
       if (!ids.length) box.append(h('div.sharenote', {}, 'Nobody yet. Pick a friend below.'));
       for (const uid2 of ids) {
         box.append(h('div.sharerow', {}, avatarEl(uid2, 20), h('span.sharename', {}, displayName(uid2)),
-          mine ? h('button.xbtn', { type: 'button', title: 'Take them out of this cluster', onclick: async () => {
+          mine ? h('button.xbtn', { type: 'button', title: 'Take them out of this ' + cfg.noun, onclick: async () => {
             const r = await unshareMember(sid, uid2);
-            if (!r.ok) toast('Could not do that just now'); else { paint(); toast('Removed from the cluster'); }
+            if (!r.ok) toast('Could not do that just now'); else { paint(); toast('Removed from the ' + cfg.noun); }
           } }, '✕') : null));
       }
       if (!mine) {
         box.append(h('div.sharenote', {}, displayName(sharedOwner(sid)) + ' shared this with you.'),
           h('button.btn.ghost.small', { type: 'button', onclick: async () => {
-            closeZonePop();
+            if (cfg.onLeave) cfg.onLeave();
             const r = await unshareMember(sid, myId());
-            toast(r.ok ? 'You have left that cluster' : 'Could not leave just now');
-          } }, 'Leave this cluster'));
+            toast(r.ok ? 'You have left that ' + cfg.noun : 'Could not leave just now');
+          } }, 'Leave this ' + cfg.noun));
         return;
       }
     }
@@ -3415,16 +3506,25 @@ function sharePanel(z) {
     const btn = h('button.btn.small', { type: 'button' }, 'Share');
     btn.addEventListener('click', async () => {
       btn.disabled = true; btn.textContent = 'Sharing…';
-      const r = await shareCluster(z, sel.value);
+      const r = await cfg.share(sel.value);
       btn.disabled = false; btn.textContent = 'Share';
-      if (!r.ok) { toast(r.message || 'Could not share that cluster'); return; }
+      if (!r.ok) { toast(r.message || 'Could not share that ' + cfg.noun); return; }
       toast('Shared with ' + displayName(sel.value));
+      if (cfg.after) cfg.after();
       paint();
     });
     box.append(h('div.sharepick', {}, sel, btn));
   };
   paint();
   return box;
+}
+function sharePanel(z) {
+  return shareBox({
+    noun: 'cluster',
+    sid: () => z.sharedId,
+    share: friendId => shareCluster(z, friendId),
+    onLeave: closeZonePop,
+  });
 }
 let zonePopWired = false;
 // One popover, used both to name a new cluster and to edit an existing one. It sits on the
@@ -5088,6 +5188,9 @@ function buildRoutine(r) {
       done = true;
       r.title = inp.value.trim();
       save();
+      // A shared routine's words belong to everyone in it, so they go up straight away
+      // rather than waiting for the next sweep.
+      if (r.sharedId) pushSharedRow(r.sharedId);
       titleSpan.textContent = r.title;
       inp.replaceWith(titleSpan);
     };
@@ -5102,19 +5205,33 @@ function buildRoutine(r) {
     titleSpan.replaceWith(inp);
     inp.focus(); inp.select();
   };
-  titleSpan.addEventListener('click', e => { e.stopPropagation(); editTitle(); });
+  // Renaming is decided when the press ends, not by a click: this header calls
+  // preventDefault on pointerdown so it can be dragged, and a cancelled pointerdown means
+  // the browser never fires the click that a listener here would have been waiting for.
   el.__editTitle = editTitle;
 
   const del = h('button.rdel', { title: 'Delete this routine' }, '✕');
   del.addEventListener('pointerdown', e => e.stopPropagation());
   del.addEventListener('click', e => {
     e.stopPropagation();
-    askDelete(e, r.title || 'this routine', () => {
-      undoableAction('Routine deleted', () => { STATE.routines = STATE.routines.filter(x => x.id !== r.id); });
-    });
+    askDelete(e, r.title || 'this routine', () => removeRoutine(r));
   });
 
-  const head = h('div.rhead', {}, titleSpan, del);
+  // One button that both says whether this routine is shared and opens the panel for it.
+  // Hidden until there is an account to share from, unless it is already shared.
+  const shareBtn = (signedIn() || r.sharedId)
+    ? h('button.rshare' + (r.sharedId ? '.on' : ''), {
+      title: r.sharedId
+        ? 'Shared with ' + (sharedMemberIds(r.sharedId).map(displayName).join(', ') || 'a friend')
+        : 'Share this routine with a friend',
+    }, '👥')
+    : null;
+  if (shareBtn) {
+    shareBtn.addEventListener('pointerdown', e => e.stopPropagation());
+    shareBtn.addEventListener('click', e => { e.stopPropagation(); routineSharePop(r, e.clientX, e.clientY); });
+  }
+
+  const head = h('div.rhead', {}, titleSpan, shareBtn, del);
   el.append(head);
 
   /* body: rendered Markdown, swapping to its plain source while you write */
@@ -5127,7 +5244,14 @@ function buildRoutine(r) {
         placeholder: 'Write the sequence. Markdown works, and a YouTube link on a line of its own becomes a player.',
       });
       let done = false;
-      const commit = () => { if (done) return; done = true; r.body = ta.value; save(); paintBody(false); };
+      const commit = () => {
+        if (done) return;
+        done = true;
+        r.body = ta.value;
+        save();
+        if (r.sharedId) pushSharedRow(r.sharedId);
+        paintBody(false);
+      };
       ta.addEventListener('blur', commit);
       ta.addEventListener('keydown', e => {
         // Enter belongs to the writing here: this is a description, not a one-line title.
@@ -5157,6 +5281,9 @@ function buildRoutine(r) {
   /* dragged by its header, the way a cluster is dragged by its name tag */
   head.addEventListener('pointerdown', e => {
     if (e.button !== 0 || e.target.closest('.rdel, input')) return;
+    // A press that starts on the name and never moves is a rename; anywhere else on the bar,
+    // or any press that turns into a drag, moves the card.
+    const onName = !!e.target.closest('.rtitle');
     e.preventDefault();
     const sx = e.clientX, sy = e.clientY, ox = r.x, oy = r.y;
     let moved = false;
@@ -5182,9 +5309,9 @@ function buildRoutine(r) {
       window.removeEventListener('pointercancel', up);
       el.classList.remove('dragging');
       try { head.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
-      if (!moved) return;
-      // The click that ends a drag would otherwise land on the title and open its editor.
-      el.addEventListener('click', ce => { ce.stopPropagation(); ce.preventDefault(); }, { capture: true, once: true });
+      // A press that never became a drag, and started on the name, opens the name box. A
+      // cancelled gesture is not a press, so it opens nothing.
+      if (!moved) { if (onName && ev && ev.type === 'pointerup') editTitle(); return; }
       save();
     };
     head.addEventListener('pointermove', mv);
@@ -5193,9 +5320,7 @@ function buildRoutine(r) {
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   });
-  onRightClickDelete(head, r.title || 'this routine', () => {
-    undoableAction('Routine deleted', () => { STATE.routines = STATE.routines.filter(x => x.id !== r.id); });
-  });
+  onRightClickDelete(head, r.title || 'this routine', () => removeRoutine(r));
 
   /* resized from the corner, so a long routine can be given the room it needs */
   const grip = h('div.rresize', { title: 'Resize' });
@@ -5228,6 +5353,48 @@ function buildRoutine(r) {
   });
   el.append(grip);
   return el;
+}
+// A shared routine is not just writing on this screen: removing it has to mean either
+// leaving it or, for whoever made it, taking it away from everyone.
+function removeRoutine(rt) {
+  if (rt.sharedId) {
+    const sid = rt.sharedId;
+    if (iOwnShared(sid)) {
+      deleteSharedRow(sid).then(ok => toast(ok ? 'Routine removed for everyone in it' : 'Could not remove that just now'));
+    } else {
+      unshareMember(sid, myId()).then(r => toast(r.ok ? 'You have left that routine' : 'Could not leave just now'));
+    }
+    return;
+  }
+  undoableAction('Routine deleted', () => { STATE.routines = STATE.routines.filter(x => x.id !== rt.id); });
+}
+function closeRoutinePop() { $$('.rsharepop').forEach(p => p.remove()); }
+let routinePopWired = false;
+// The share panel sits on the body at a fixed spot rather than on the routines plane, for
+// the same reasons the cluster's does: on the plane it would scale with the zoom and be
+// wiped out by any redraw that happened to land mid-pick.
+function routineSharePop(rt, atX, atY) {
+  closeRoutinePop();
+  const pop = h('div.rsharepop', { role: 'dialog', 'aria-label': 'Share this routine' },
+    shareBox({
+      noun: 'routine',
+      sid: () => rt.sharedId,
+      share: friendId => shareRoutine(rt, friendId),
+      onLeave: closeRoutinePop,
+      after: renderRoutines,          // the card's mark lights up once it is shared
+    }));
+  document.body.append(pop);
+  const pr = pop.getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(atX - 24, innerWidth - pr.width - 8)) + 'px';
+  pop.style.top = Math.max(8, Math.min(atY + 12, innerHeight - pr.height - 8)) + 'px';
+  if (!routinePopWired) {
+    routinePopWired = true;
+    document.addEventListener('pointerdown', ev => {
+      const p = $('.rsharepop');
+      if (p && !p.contains(ev.target) && !ev.target.closest('.rshare')) closeRoutinePop();
+    }, true);
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeRoutinePop(); });
+  }
 }
 function newRoutineAt(x, y) {
   const r = {
