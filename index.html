@@ -289,19 +289,70 @@ main{flex:1;min-height:0;position:relative}
 @keyframes chipin{0%{opacity:0;transform:translateY(6px)}12%{opacity:1;transform:none}80%{opacity:1}100%{opacity:0;transform:translateY(-6px)}}
 
 /* toolbar */
-#toolbar{
+#toolbar,#rtoolbar{
   position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
   display:flex;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100vw - 24px);gap:4px;padding:5px;border-radius:14px;background:var(--surface);
   border:1px solid var(--line);box-shadow:var(--shadow-big);z-index:30;
 }
-#toolbar button{
+#toolbar button,#rtoolbar button{
   display:flex;align-items:center;gap:7px;padding:8px 14px;border-radius:10px;font-weight:700;font-size:13px;
 }
-#toolbar button:hover{background:var(--accent-soft)}
-#toolbar button.primary{background:var(--accent);color:var(--accent-ink)}
-#toolbar button.primary:hover{background:var(--accent-hover)}
-#toolbar button.on{background:var(--ink);color:var(--paper)}
-#toolbar svg{width:15px;height:15px}
+#toolbar button:hover,#rtoolbar button:hover{background:var(--accent-soft)}
+#toolbar button.primary,#rtoolbar button.primary{background:var(--accent);color:var(--accent-ink)}
+#toolbar button.primary:hover,#rtoolbar button.primary:hover{background:var(--accent-hover)}
+#toolbar button.on,#rtoolbar button.on{background:var(--ink);color:var(--paper)}
+#toolbar svg,#rtoolbar svg{width:15px;height:15px}
+
+/* ---------- routines: a board of written sequences ---------- */
+/* Its own plane, with its own pan and zoom, so a long routine can be parked beside the ones
+   it belongs with instead of competing with the tasks for room. */
+#rboard{
+  position:absolute;inset:0;overflow:hidden;z-index:0;
+  background-image:radial-gradient(var(--dots) 1.2px,transparent 1.2px);
+  background-size:24px 24px;
+  cursor:grab;touch-action:none;
+}
+#rboard.panning{cursor:grabbing;user-select:none}
+#rfield{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0}
+.rcard{
+  position:absolute;display:flex;flex-direction:column;overflow:hidden;
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  box-shadow:var(--shadow);
+}
+.rcard.dragging{box-shadow:var(--shadow-big);z-index:999}
+.rhead{
+  flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:8px 8px 8px 13px;
+  border-bottom:1px solid var(--line);background:var(--raise);
+  cursor:grab;user-select:none;touch-action:none;
+}
+.rhead:active{cursor:grabbing}
+.rtitle{
+  flex:1;min-width:0;font-weight:800;font-size:14px;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  cursor:text;border-radius:6px;padding:1px 5px;margin:-1px -5px;
+}
+.rtitle:hover{background:var(--accent-soft)}
+.rtitle:empty::before{content:"Untitled routine";opacity:.45}
+.rtitleedit{
+  flex:1;min-width:0;font:inherit;font-weight:800;font-size:14px;line-height:1.3;
+  border:none;outline:none;background:transparent;color:var(--ink);padding:1px 5px;margin:-1px -5px;
+}
+.rdel{flex:0 0 auto;width:22px;height:22px;border-radius:7px;color:var(--ink3);font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center}
+.rdel:hover{color:var(--danger);background:var(--danger-soft)}
+.rbody{flex:1;min-height:0;overflow-y:auto;padding:11px 14px 13px}
+.rbody .mdbody{margin:0;padding:0;font-size:13px}
+.rbody .descadd{font-size:12.5px}
+.rbodyedit{
+  width:100%;height:100%;min-height:70px;border:none;outline:none;resize:none;background:transparent;
+  font:inherit;font-size:13px;line-height:1.55;color:var(--ink2);
+}
+.rresize{position:absolute;right:0;bottom:0;width:20px;height:20px;cursor:nwse-resize;touch-action:none}
+.rresize::after{content:"";position:absolute;right:6px;bottom:6px;width:8px;height:8px;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);border-radius:1px}
+/* an embedded video, with a way through underneath: a strict content policy blocks the
+   frame outright, and without the link the video would just be a black box */
+.mdbody .ytwrap{position:relative;width:100%;padding-top:56.25%;margin:10px 0 5px;border-radius:10px;overflow:hidden;background:#0D0D10;border:1px solid var(--line)}
+.mdbody .ytwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.mdbody a.ytlink{display:inline-block;font-size:11.5px;margin-bottom:10px}
 
 /* ---------- shared controls ---------- */
 .btn{
@@ -735,8 +786,11 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
   #topbar{gap:6px;padding:0 8px}
   .wordmark span{display:none}
   #meters{display:none}          /* the Goals and Dashboard pages carry the same numbers */
-  .tabs{margin-right:auto}
-  .tabs .tab{padding:6px 5px;font-size:12.5px}
+  /* Five tabs no longer fit on a phone. The strip slides sideways rather than shouldering
+     the menu and theme buttons off the end of the bar, where nothing could reach them. */
+  .tabs{margin-right:auto;min-width:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs .tab{padding:6px 5px;font-size:12.5px;flex:0 0 auto}
 }
 </style>
 
@@ -748,6 +802,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
     </div>
     <nav class="tabs">
       <a class="tab" href="#canvas" data-page="canvas">Canvas</a>
+      <a class="tab" href="#routines" data-page="routines">Routines</a>
       <a class="tab" href="#archive" data-page="archive">Archive</a>
       <a class="tab" href="#goals" data-page="goals">Goals</a>
       <a class="tab" href="#dashboard" data-page="dashboard">Dashboard</a>
@@ -793,6 +848,22 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
           Arrow
         </button>
         <button id="btnHome" title="Fit everything back on screen (or press F)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg>
+          Fit
+        </button>
+      </div>
+    </section>
+
+    <section class="page" id="pg-routines">
+      <div id="rboard">
+        <div id="rfield"></div>
+      </div>
+      <div id="rtoolbar">
+        <button id="btnRoutine" class="primary" title="Write a new routine (or double-click the board)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Routine
+        </button>
+        <button id="btnRFit" title="Fit everything back on screen (or press F)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg>
           Fit
         </button>
@@ -951,9 +1022,12 @@ function save() {
   saveTimer = setTimeout(() => storeSet(STORE_KEY, JSON.stringify(STATE)), 250);
   schedulePush();
 }
+// A routine card's smallest useful box. Defined here because migrate() checks it before the
+// routines board's own code has had a chance to run.
+const R_MIN_W = 240, R_MIN_H = 150;
 function blankState() {
   return {
-    v: 6, notes: [], cats: [], zones: [], links: [], goals: [], wishes: [], habits: [], zTop: 10,
+    v: 6, notes: [], cats: [], zones: [], links: [], routines: [], goals: [], wishes: [], habits: [], zTop: 10,
     meta: { updatedAt: Date.now() },
   };
 }
@@ -968,6 +1042,16 @@ function migrate(s) {
   // screen, never about the board, so it must not survive a reload or ride along to
   // another device: a board that loads with a phantom open editor looks stuck.
   for (const n of s.notes) delete n.editing;
+  // Routines are written pieces with a place on their own board. Their shape is checked here
+  // because a board that arrives with a routine missing its box would render at 0 by 0.
+  if (!Array.isArray(s.routines)) s.routines = [];
+  for (const r of s.routines) {
+    if (typeof r.title !== 'string') r.title = '';
+    if (typeof r.body !== 'string') r.body = '';
+    r.x = Number(r.x) || 0; r.y = Number(r.y) || 0;
+    r.w = Math.max(R_MIN_W, Number(r.w) || R_MIN_W);
+    r.h = Math.max(R_MIN_H, Number(r.h) || R_MIN_H);
+  }
   if (!Array.isArray(s.wishes)) s.wishes = [];
   if (!Array.isArray(s.goals)) s.goals = [];
   if (!Array.isArray(s.cats)) s.cats = [];
@@ -1032,6 +1116,20 @@ function seedState() {
     { id: uid(), name: 'Stretch for five minutes', order: 1, createdAt: now, archivedAt: null, days: {} },
     { id: uid(), name: 'Read 10 pages', order: 2, createdAt: now, archivedAt: null, days: {} },
   );
+  s.routines.push({
+    id: uid(), title: 'Morning, roughly', x: 60, y: 60, w: 360, h: 300, z: ++s.zTop, createdAt: now,
+    body: [
+      'Click this text to edit it. It is **Markdown**, so:',
+      '',
+      '1. Water, before anything else',
+      '2. Ten minutes of stretching',
+      '3. Write the one thing that matters today',
+      '',
+      '> Paste a YouTube address on a line of its own and it turns into a player.',
+      '',
+      'Drag the bar at the top to move this card, and the corner to resize it.',
+    ].join('\n'),
+  });
   return s;
 }
 let returningUser = false; // had a board in this browser before this visit
@@ -1145,7 +1243,29 @@ function mdInline(s, imgs) {
   t = t.replace(/~~([^~]+)~~/g, '<del>$1</del>');
   return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + mdEsc(codes[Number(i)]) + '</code>');
 }
-function mdToHtml(src, imgs) {
+// A YouTube address on a line of its own becomes a player. The id is pulled out and checked
+// against the 11-character shape YouTube uses, and the embed address is built here rather
+// than taken from the text, so nothing a person types can reach the iframe's src.
+function youtubeId(raw) {
+  const s = String(raw || '').trim();
+  const pats = [
+    /^https?:\/\/(?:www\.|m\.)?youtube(?:-nocookie)?\.com\/watch\?(?:[^#]*&)?v=([A-Za-z0-9_-]{11})(?:[&#].*)?$/,
+    /^https?:\/\/youtu\.be\/([A-Za-z0-9_-]{11})(?:[?#].*)?$/,
+    /^https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/(?:embed|shorts|live|v)\/([A-Za-z0-9_-]{11})(?:[?#].*)?$/,
+  ];
+  for (const p of pats) { const m = s.match(p); if (m) return m[1]; }
+  return '';
+}
+// The link underneath is not decoration: a strict content policy (the claude.ai preview, for
+// one) blocks the frame outright, and without it the video would simply be a black box.
+function youtubeEmbed(id) {
+  return '<div class="ytwrap"><iframe src="https://www.youtube-nocookie.com/embed/' + id
+    + '" title="YouTube video" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"'
+    + ' allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>'
+    + '<a class="ytlink" href="https://www.youtube.com/watch?v=' + id + '" target="_blank" rel="noopener noreferrer">Open on YouTube</a>';
+}
+function mdToHtml(src, imgs, opts) {
+  const embeds = !!(opts && opts.embeds);
   const lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
   let out = '', i = 0;
   const para = [];
@@ -1178,7 +1298,7 @@ function mdToHtml(src, imgs) {
       flush();
       const buf = [];
       while (i < lines.length && MD_QUOTE.test(lines[i])) { buf.push(lines[i].replace(MD_QUOTE, '')); i++; }
-      out += '<blockquote>' + mdToHtml(buf.join('\n'), imgs) + '</blockquote>';
+      out += '<blockquote>' + mdToHtml(buf.join('\n'), imgs, opts) + '</blockquote>';
       continue;
     }
     const ul = MD_UL.test(line), ol = !ul && MD_OL.test(line);
@@ -1196,6 +1316,11 @@ function mdToHtml(src, imgs) {
       }
       out += ul ? '<ul>' + items + '</ul>' : '<ol>' + items + '</ol>';
       continue;
+    }
+    // A bare YouTube address, alone on its line, is a video rather than a paragraph.
+    if (embeds) {
+      const vid = youtubeId(line);
+      if (vid) { flush(); out += youtubeEmbed(vid); i++; continue; }
     }
     para.push(line);
     i++;
@@ -1334,15 +1459,19 @@ function currentPage() { return pageName; }
 // Only the canvas carries a bottom toolbar, and toasts land in the same corner. Marking
 // the page on the body lets them sit above it there and stay low everywhere else. Called
 // at boot as well as on every move, since a sign-in toast can arrive before the first route.
-function syncPageChrome() { document.body.classList.toggle('canvasview', pageName === 'canvas'); }
+function syncPageChrome() { document.body.classList.toggle('canvasview', pageName === 'canvas' || pageName === 'routines'); }
 function go(pg) {
-  pageName = ['canvas', 'archive', 'goals', 'dashboard'].includes(pg) ? pg : 'canvas';
+  pageName = ['canvas', 'routines', 'archive', 'goals', 'dashboard'].includes(pg) ? pg : 'canvas';
   try { if (location.hash !== '#' + pageName) history.replaceState(null, '', '#' + pageName); } catch (e) { /* data:/sandboxed pages */ }
   $$('.page').forEach(p => p.classList.toggle('active', p.id === 'pg-' + pageName));
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.page === pageName));
+  // On a phone the tab strip slides, so the page you just opened has to be brought into view.
+  const at = $('.tab.active');
+  if (at && at.scrollIntoView) { try { at.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) { /* older browsers */ } }
   syncPageChrome();
   // An armed toolbar button should not still be waiting when you wander back later.
-  if (pageName !== 'canvas') { setDrawMode(false); setPlaceMode(false); }
+  if (pageName !== 'canvas') { setDrawMode(false); setPlaceMode(false); setLinkMode(false); }
+  if (pageName === 'routines') renderRoutines();
   if (pageName === 'archive') renderArchive();
   if (pageName === 'goals') renderGoals();
   if (pageName === 'dashboard') renderDashboard();
@@ -2427,7 +2556,6 @@ const TODAY_PANEL = {
   title: 'Today I want to…',
   show: 'Show today’s list',
   hide: 'Hide today’s list',
-  empty: 'Press the sun on any task to line it up for today. It stays where it is on the canvas.',
   off: 'Take it off today’s list',
   list: todayNotes,
   remove: n => setToday(n, false),
@@ -2439,7 +2567,6 @@ const STAR_PANEL = {
   title: 'High priority',
   show: 'Show the starred list',
   hide: 'Hide the starred list',
-  empty: 'Press the star on any task to keep it in front of you. It stays where it is on the canvas.',
   off: 'Take the star off',
   list: starredNotes,
   remove: n => setStarred(n, false),
@@ -2465,7 +2592,7 @@ function renderPanel(cfg) {
     list.length ? h('span.tpCount', {}, String(list.length)) : null));
   if (collapsed) return;
   const body = h('div.tpBody');
-  if (!list.length) body.append(h('div.tpEmpty', {}, cfg.empty));
+  if (!list.length && cfg.empty) body.append(h('div.tpEmpty', {}, cfg.empty));
   for (const n of list) {
     const row = h('div.tpRow', { title: 'Show me on the canvas' },
       h('span.tpDot', { style: { background: noteBg(n) } }),
@@ -3223,7 +3350,7 @@ function wireCanvas() {
   // focus after being clicked, which is why this is looser than spaceIsOurs: what it must
   // never do is take a letter out of a text box.
   const typingIn = t => !!t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
-  const shortcutIsOurs = (e, t) => currentPage() === 'canvas'
+  const shortcutIsOurs = (e, t) => ['canvas', 'routines'].includes(currentPage())
     && !e.ctrlKey && !e.metaKey && !e.altKey
     && !typingIn(t) && !$('#welcome') && !$('#modalRoot').classList.contains('open');
   document.addEventListener('keydown', e => {
@@ -3232,10 +3359,10 @@ function wireCanvas() {
       if ($('.catpop')) { closeCatPop(); return; }
       setDrawMode(false); setPlaceMode(false); setLinkMode(false); closeModal(); $$('.zonepop').forEach(p => p.remove());
     }
-    // F fits the board, the same as the Fit button.
+    // F fits whichever board you are looking at, the same as its Fit button.
     if ((e.key === 'f' || e.key === 'F') && shortcutIsOurs(e, e.target)) {
       e.preventDefault();
-      recenter();
+      if (currentPage() === 'routines') rFit(); else recenter();
     }
     if (e.code === 'Space' && spaceIsOurs(e.target)) {
       if (!spaceHeld) { spaceHeld = true; board.classList.add('panready'); }
@@ -4847,6 +4974,339 @@ function openWishLinkEditor(w) {
   setTimeout(() => { nameIn.focus(); nameIn.select(); }, 0);
 }
 
+/* ---------- routines: a board of written sequences ---------- */
+// A routine is a piece of writing rather than a task: a title, a body in Markdown, and a
+// place on its own plane. It gets its own board, with its own pan and zoom, because the
+// canvas is about things to knock down and this is about how you go about them.
+const R_VIEW_KEY = 'dayu-rview-v1';
+let rZoom = 1, rPanX = 0, rPanY = 0;
+let rViewReady = false;
+
+function routineById(id) { return STATE.routines.find(r => r.id === id) || null; }
+function rSaveView() {
+  try { storeSet(R_VIEW_KEY, JSON.stringify({ zoom: rZoom, panX: rPanX, panY: rPanY })); } catch (e) { /* private mode */ }
+}
+function rLoadView() {
+  try {
+    const v = JSON.parse(storeGet(R_VIEW_KEY) || 'null');
+    if (v && isFinite(v.panX) && isFinite(v.panY)) {
+      rPanX = v.panX; rPanY = v.panY;
+      rZoom = clamp(isFinite(v.zoom) ? v.zoom : 1, ZOOM_MIN, ZOOM_MAX);
+      return true;
+    }
+  } catch (e) { /* nothing saved, or unreadable */ }
+  return false;
+}
+function rApplyView() {
+  const field = $('#rfield'), board = $('#rboard');
+  if (!field || !board) return;
+  field.style.transform = 'translate(' + rPanX + 'px,' + rPanY + 'px) scale(' + rZoom + ')';
+  board.style.backgroundSize = (24 * rZoom) + 'px ' + (24 * rZoom) + 'px';
+  board.style.backgroundPosition = rPanX + 'px ' + rPanY + 'px';
+  rSaveView();
+}
+function rToPlane(clientX, clientY) {
+  const rb = $('#rboard').getBoundingClientRect();
+  return { x: (clientX - rb.left - rPanX) / rZoom, y: (clientY - rb.top - rPanY) / rZoom };
+}
+function rSetZoom(next, clientX, clientY) {
+  next = clamp(next, ZOOM_MIN, ZOOM_MAX);
+  if (next === rZoom) return;
+  const rb = $('#rboard').getBoundingClientRect();
+  const px = clientX == null ? rb.width / 2 : clientX - rb.left;
+  const py = clientY == null ? rb.height / 2 : clientY - rb.top;
+  const cx = (px - rPanX) / rZoom, cy = (py - rPanY) / rZoom;
+  rZoom = next;
+  rPanX = px - cx * rZoom; rPanY = py - cy * rZoom;
+  rApplyView();
+}
+function rBounds() {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const r of STATE.routines) {
+    minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.h);
+  }
+  return isFinite(minX) ? { minX, minY, maxX, maxY } : null;
+}
+// The toolbar sits over the bottom of this board too, so the fit leaves it a strip.
+const R_TOOLBAR_BAND = 80;
+function rFit() {
+  const board = $('#rboard');
+  if (!board) return;
+  const rb = board.getBoundingClientRect();
+  if (!rb.width || !rb.height) return;                 // the page is not on screen yet
+  const vh = Math.max(140, rb.height - R_TOOLBAR_BAND);
+  const b = rBounds();
+  if (!b) { rZoom = 1; rPanX = 40; rPanY = 40; rApplyView(); return; }
+  const pad = 60;
+  const w = (b.maxX - b.minX) + pad * 2, hgt = (b.maxY - b.minY) + pad * 2;
+  rZoom = clamp(Math.min(rb.width / w, vh / hgt, 1), ZOOM_MIN, ZOOM_MAX);
+  rPanX = rb.width / 2 - ((b.minX + b.maxX) / 2) * rZoom;
+  rPanY = vh / 2 - ((b.minY + b.maxY) / 2) * rZoom;
+  rApplyView();
+}
+// Is any routine actually on screen with the view as it stands?
+function rAnythingVisible() {
+  const board = $('#rboard');
+  const b = rBounds();
+  if (!board || !b) return true;                       // nothing to have lost sight of
+  const rb = board.getBoundingClientRect();
+  if (!rb.width) return true;
+  return (b.maxX * rZoom + rPanX) > 0 && (b.maxY * rZoom + rPanY) > 0
+    && (b.minX * rZoom + rPanX) < rb.width && (b.minY * rZoom + rPanY) < rb.height;
+}
+function renderRoutines() {
+  const field = $('#rfield'), board = $('#rboard');
+  if (!field || !board) return;
+  field.innerHTML = '';
+  // Drawn in z order, so whichever was raised last is the one on top.
+  for (const r of STATE.routines.slice().sort((a, b) => (a.z || 0) - (b.z || 0))) field.append(buildRoutine(r));
+  $$('.hint', board).forEach(el => el.remove());
+  if (!STATE.routines.length) {
+    board.append(h('div.hint', {},
+      h('div', { style: { fontSize: '34px', marginBottom: '10px' } }, '🧭'),
+      h('div', {}, h('b', {}, 'Double-click anywhere'), ' to write your first routine.'),
+      h('div', { style: { marginTop: '4px' } }, 'Markdown works, and a YouTube link on a line of its own becomes a player.')));
+  }
+  // A remembered view with nothing in it is worse than no remembered view: the board would
+  // open on blank plane with the routines somewhere off the edge.
+  if (!rViewReady) { rViewReady = true; if (!rLoadView() || !rAnythingVisible()) rFit(); }
+  rApplyView();
+}
+function buildRoutine(r) {
+  const el = h('div.rcard', { dataset: { id: r.id }, style: {
+    left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px', zIndex: r.z || 10,
+  } });
+
+  /* title: a click turns it into a box, Enter or clicking away puts it back */
+  const titleSpan = h('span.rtitle', { title: 'Click to rename' }, r.title);
+  const editTitle = () => {
+    const inp = h('input.rtitleedit', { value: r.title || '', placeholder: 'Name this routine', maxLength: 80 });
+    let done = false;
+    const commit = () => {
+      if (done) return;
+      done = true;
+      r.title = inp.value.trim();
+      save();
+      titleSpan.textContent = r.title;
+      inp.replaceWith(titleSpan);
+    };
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e => {
+      if (imeBusy(e)) { e.stopPropagation(); return; }
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { inp.value = r.title || ''; inp.blur(); }
+      e.stopPropagation();
+    });
+    inp.addEventListener('pointerdown', e => e.stopPropagation());
+    titleSpan.replaceWith(inp);
+    inp.focus(); inp.select();
+  };
+  titleSpan.addEventListener('click', e => { e.stopPropagation(); editTitle(); });
+  el.__editTitle = editTitle;
+
+  const del = h('button.rdel', { title: 'Delete this routine' }, '✕');
+  del.addEventListener('pointerdown', e => e.stopPropagation());
+  del.addEventListener('click', e => {
+    e.stopPropagation();
+    askDelete(e, r.title || 'this routine', () => {
+      undoableAction('Routine deleted', () => { STATE.routines = STATE.routines.filter(x => x.id !== r.id); });
+    });
+  });
+
+  const head = h('div.rhead', {}, titleSpan, del);
+  el.append(head);
+
+  /* body: rendered Markdown, swapping to its plain source while you write */
+  const body = h('div.rbody');
+  const paintBody = editing => {
+    body.innerHTML = '';
+    if (editing) {
+      const ta = h('textarea.rbodyedit', {
+        value: r.body || '',
+        placeholder: 'Write the sequence. Markdown works, and a YouTube link on a line of its own becomes a player.',
+      });
+      let done = false;
+      const commit = () => { if (done) return; done = true; r.body = ta.value; save(); paintBody(false); };
+      ta.addEventListener('blur', commit);
+      ta.addEventListener('keydown', e => {
+        // Enter belongs to the writing here: this is a description, not a one-line title.
+        if (imeBusy(e)) { e.stopPropagation(); return; }
+        if (e.key === 'Escape') ta.blur();
+        e.stopPropagation();
+      });
+      ta.addEventListener('pointerdown', e => e.stopPropagation());
+      body.append(ta);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      return;
+    }
+    if ((r.body || '').trim()) {
+      const view = h('div.mdbody', { title: 'Click to edit' });
+      view.innerHTML = mdToHtml(r.body, null, { embeds: true });
+      // A link, a picture or the video itself is there to be used, not to open the editor.
+      view.addEventListener('click', ev => { if (!ev.target.closest('a, img, iframe, .ytwrap')) paintBody(true); });
+      body.append(view);
+      return;
+    }
+    body.append(h('button.descadd', { onclick: () => paintBody(true) }, 'Write the steps…'));
+  };
+  paintBody(false);
+  el.append(body);
+
+  /* dragged by its header, the way a cluster is dragged by its name tag */
+  head.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('.rdel, input')) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ox = r.x, oy = r.y;
+    let moved = false;
+    try { head.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!moved) {
+        if (Math.abs(dx) + Math.abs(dy) < 4) return;
+        moved = true;
+        el.classList.add('dragging');
+        r.z = ++STATE.zTop; el.style.zIndex = r.z;
+      }
+      r.x = ox + dx / rZoom; r.y = oy + dy / rZoom;      // the plane has no edges
+      el.style.left = r.x + 'px'; el.style.top = r.y + 'px';
+    };
+    const up = ev => {
+      if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+      head.removeEventListener('pointermove', mv);
+      head.removeEventListener('pointerup', up);
+      head.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      el.classList.remove('dragging');
+      try { head.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      if (!moved) return;
+      // The click that ends a drag would otherwise land on the title and open its editor.
+      el.addEventListener('click', ce => { ce.stopPropagation(); ce.preventDefault(); }, { capture: true, once: true });
+      save();
+    };
+    head.addEventListener('pointermove', mv);
+    head.addEventListener('pointerup', up);
+    head.addEventListener('pointercancel', up);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+  onRightClickDelete(head, r.title || 'this routine', () => {
+    undoableAction('Routine deleted', () => { STATE.routines = STATE.routines.filter(x => x.id !== r.id); });
+  });
+
+  /* resized from the corner, so a long routine can be given the room it needs */
+  const grip = h('div.rresize', { title: 'Resize' });
+  grip.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const sx = e.clientX, sy = e.clientY, w0 = r.w, h0 = r.h;
+    try { grip.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      r.w = Math.max(R_MIN_W, w0 + (ev.clientX - sx) / rZoom);
+      r.h = Math.max(R_MIN_H, h0 + (ev.clientY - sy) / rZoom);
+      el.style.width = r.w + 'px'; el.style.height = r.h + 'px';
+    };
+    const up = ev => {
+      if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+      grip.removeEventListener('pointermove', mv);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      try { grip.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      save();
+    };
+    grip.addEventListener('pointermove', mv);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', up);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+  el.append(grip);
+  return el;
+}
+function newRoutineAt(x, y) {
+  const r = {
+    id: uid(), title: '', body: '',
+    x: Math.round(x), y: Math.round(y), w: 340, h: 280,
+    z: ++STATE.zTop, createdAt: Date.now(),
+  };
+  STATE.routines.push(r);
+  save();
+  renderRoutines();
+  // Straight into naming it, the way a new task opens its title box.
+  const el = $('.rcard[data-id="' + r.id + '"]');
+  if (el && el.__editTitle) el.__editTitle();
+}
+// The button drops one in the middle of what you are looking at, stepping off anything
+// already sitting there rather than burying it.
+function addRoutineHere() {
+  const rb = $('#rboard').getBoundingClientRect();
+  const c = rToPlane(rb.left + rb.width / 2, rb.top + rb.height / 2);
+  let x = Math.round(c.x - 170), y = Math.round(c.y - 140);
+  for (let i = 0; i < 40 && STATE.routines.some(r => Math.abs(r.x - x) < 26 && Math.abs(r.y - y) < 26); i++) { x += 28; y += 28; }
+  newRoutineAt(x, y);
+}
+function wireRoutines() {
+  const board = $('#rboard'), field = $('#rfield');
+  if (!board) return;
+  $('#btnRoutine').addEventListener('click', addRoutineHere);
+  $('#btnRFit').addEventListener('click', rFit);
+
+  board.addEventListener('wheel', e => {
+    e.preventDefault();
+    rSetZoom(rZoom * Math.exp(-e.deltaY * 0.0016), e.clientX, e.clientY);
+  }, { passive: false });
+  window.addEventListener('resize', () => { if (currentPage() === 'routines') rApplyView(); });
+
+  board.addEventListener('dblclick', e => {
+    if (e.target !== board && e.target !== field) return;
+    const p = rToPlane(e.clientX, e.clientY);
+    newRoutineAt(p.x - 170, p.y - 26);
+  });
+
+  // Empty board drags the view. A press inside a card belongs to the card.
+  board.addEventListener('pointerdown', e => {
+    if (e.button !== 0 && e.button !== 1) return;
+    if (e.target.closest('.rcard')) return;
+    const sx = e.clientX, sy = e.clientY;
+    const p0x = rPanX, p0y = rPanY;
+    let panning = false;
+    try { board.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety */ }
+    const mv = ev => {
+      if (ev.pointerId !== e.pointerId) return;
+      const dx = ev.clientX - sx, dy = ev.clientY - sy;
+      if (!panning) {
+        if (Math.abs(dx) + Math.abs(dy) < 4) return;
+        panning = true;
+        board.classList.add('panning');
+      }
+      if (ev.cancelable) ev.preventDefault();
+      rPanX = p0x + dx; rPanY = p0y + dy;
+      rApplyView();
+    };
+    const up = ev => {
+      if (ev && ev.pointerId !== undefined && ev.pointerId !== e.pointerId) return;
+      board.removeEventListener('pointermove', mv);
+      board.removeEventListener('pointerup', up);
+      board.removeEventListener('pointercancel', up);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      board.classList.remove('panning');
+      try { board.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    };
+    board.addEventListener('pointermove', mv);
+    board.addEventListener('pointerup', up);
+    board.addEventListener('pointercancel', up);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+}
+
 /* ---------- boot ---------- */
 function boot() {
   STATE = loadState();
@@ -4855,6 +5315,7 @@ function boot() {
   wireTheme();
   wireMenu();
   wireCanvas();
+  wireRoutines();
   wireTabs();
   syncPageChrome();
   renderMeters(); renderCanvas();
