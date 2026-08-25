@@ -731,7 +731,15 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
 .hcell.c-yellow{background:var(--warn)}
 .hcell.c-red{background:var(--danger)}
 .htable td.hname input{width:100%;border:none;outline:none;background:transparent;font:inherit}
-.haddrow input{width:100%;border:none;outline:none;background:transparent;padding:10px 12px;font-size:13px}
+.hsheetwrap{margin-bottom:10px}
+/* the add box lives below the grid, never inside it, so horizontal scroll cannot hide it */
+.haddbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:22px}
+.haddbox:focus-within{border-color:var(--accent)}
+.haddbox input{width:100%;border:none;outline:none;background:transparent;padding:11px 14px;font-size:13px;border-radius:12px}
+/* the browser's faded default left this at 3.3:1 on the dark surface, and this box is the
+   only way onto the page when there are no goals yet */
+.haddbox input::placeholder{color:var(--ink2);opacity:1}
+.hempty{color:var(--ink3);font-size:12.5px;line-height:1.55;margin-bottom:10px}
 .todaychip{font-size:11.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
 
 /* ---------- archive view switch & goal history ---------- */
@@ -4324,26 +4332,30 @@ function renderHabitSheet() {
     }
     tbody.append(tr);
   }
-  // add row
+  // The add box sits OUTSIDE the scrolling grid. Inside it, its row spanned every column,
+  // which left the sticky cell nothing to shift within, so the box stayed at the far left
+  // of the plane: once the sheet had parked on today it was well over a thousand pixels off
+  // to the left, and the only way to reach it was to scroll all the way back.
   const addInp = h('input', { placeholder: '＋ Add a daily goal and press Enter…', maxLength: 60 });
   addInp.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !imeBusy(e) && addInp.value.trim()) {
       const maxOrder = STATE.habits.reduce((m, x) => Math.max(m, x.order || 0), 0);
       STATE.habits.push({ id: uid(), name: addInp.value.trim(), order: maxOrder + 1, createdAt: Date.now(), archivedAt: null, days: {} });
       save(); renderGoals(); renderMeters();
-      // preventScroll, or focusing this box (which lives in the sticky left column) drags
-      // the sheet back to its far left and undoes the scroll that parks today on the edge.
-      setTimeout(() => { const i = $('.haddrow input'); if (i) i.focus({ preventScroll: true }); }, 0);
+      // preventScroll, so that landing the caret back in the box cannot drag the page.
+      setTimeout(() => { const i = $('.haddbox input'); if (i) i.focus({ preventScroll: true }); }, 0);
     }
   });
-  tbody.append(h('tr.haddrow', {}, h('td.hname', { colSpan: SHEET_DAYS + 1, style: { maxWidth: 'none' } }, addInp)));
 
-  const wrap = h('div.hwrap', {}, h('table.htable', {}, thead, tbody));
-  box.append(wrap);
-  setTimeout(() => parkSheetOnToday(wrap), 0);
-  if (!habs.length) {
-    box.lastChild.before(h('div', { style: { color: 'var(--ink3)', fontSize: '12.5px', marginBottom: '8px' } }, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
+  if (habs.length) {
+    const wrap = h('div.hwrap.hsheetwrap', {}, h('table.htable', {}, thead, tbody));
+    box.append(wrap);
+    setTimeout(() => parkSheetOnToday(wrap), 0);
+  } else {
+    // Nothing to rule yet. A grid of 121 empty days says nothing that this does not.
+    box.append(h('div.hempty', {}, 'Goals you want to hit every day. Add one below, then click a cell to mark it: green for done, blue for a planned rest day, yellow, or red for anything else. Click again to cycle through, or once more to clear it. The Dashboard tab keeps score off the green days, and a rest day never counts against you.'));
   }
+  box.append(h('div.haddbox', {}, addInp));
   return box;
 }
 // Park today against the left edge of the scrolling area, just past the sticky name column,
