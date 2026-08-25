@@ -491,6 +491,14 @@ main{flex:1;min-height:0;position:relative}
   .sfoot .catbtn{max-width:130px}
 }
 
+/* the on-device backups, listed in the restore sheet */
+.bakrow{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.bakrow .bakinfo{flex:1;min-width:0}
+.bakrow .bakwhen{font-weight:800;font-size:13.5px}
+.bakrow .bakwhat{font-size:12px;color:var(--ink2);margin-top:2px;font-variant-numeric:tabular-nums}
+.bakrow .bakwhy{font-size:11.5px;color:var(--ink3);margin-top:2px}
+.bakempty{font-size:12.5px;color:var(--ink3);line-height:1.5;padding:2px 0 6px}
+
 /* ---------- archive ---------- */
 .filters{display:flex;flex-direction:column;gap:12px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;margin-bottom:18px}
 .filters .frow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -826,6 +834,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
       <div class="sep"></div>
       <button id="mExport">Export backup (.json)</button>
       <button id="mImport">Import backup…</button>
+      <button id="mRestore">Restore a backup…</button>
       <div class="sep"></div>
       <button id="mReset" class="danger">Clear everything</button>
     </div>
@@ -1517,12 +1526,73 @@ function importBackup(file) {
       const s = JSON.parse(rd.result);
       if (!s || !Array.isArray(s.notes)) throw new Error('bad shape');
       const snap = snapshot();
+      stashBoard('before an import');
       STATE = migrate(s);
       save(); renderAll();
       toast('Backup imported', () => restore(snap));
     } catch (e) { toast('That file doesn’t look like a Dayu backup'); }
   };
   rd.readAsText(file);
+}
+// The backups, offered back: the three kept on this device, then the versions the
+// database filed away on the account. Each row says when it was kept and how much board
+// is in it, so picking one is a decision rather than a gamble.
+function bakRow(when, counts, why, onRestore) {
+  return h('div.bakrow', {},
+    h('div.bakinfo', {},
+      h('div.bakwhen', {}, when),
+      h('div.bakwhat', {}, counts),
+      why ? h('div.bakwhy', {}, why) : null),
+    h('button.btn.small', { onclick: onRestore }, 'Restore'));
+}
+function bakCounts(n) {
+  return (n.notes || []).length + ' tasks · ' + (n.zones || []).length + ' clusters · '
+    + (n.routines || []).length + ' routines · ' + (n.habits || []).length + ' daily goals';
+}
+function openRestoreSheet() {
+  const root = $('#modalRoot');
+  root.innerHTML = ''; root.classList.add('open');
+  const baks = listBackups();
+  const body = h('div.sbody', {},
+    h('h1', { style: { fontSize: '19px', fontWeight: '800', marginBottom: '2px' } }, 'Restore a backup'),
+    h('div', { style: { color: 'var(--ink2)', marginBottom: '16px', fontSize: '13px' } },
+      'Restoring puts a board back and makes it the account’s copy on every device.'));
+  body.append(h('div.label', { style: { marginBottom: '8px' } }, 'Kept on this device'));
+  if (!baks.length) {
+    body.append(h('div.bakempty', {}, 'Nothing here yet. A backup appears the first time the board is replaced by a sync, an import, or Clear everything.'));
+  }
+  for (const b of baks) {
+    body.append(bakRow(fmtFull(b.at), bakCounts(b.board), b.reason || '', () => { closeModal(); restoreBackup(b.key); }));
+  }
+  // The account's own history arrives second, since it needs a round trip.
+  const srv = h('div');
+  body.append(h('div.label', { style: { margin: '14px 0 8px' } }, 'Kept on the account'), srv);
+  srv.append(h('div.bakempty', {}, 'Checking…'));
+  listServerHistory().then(res => {
+    srv.innerHTML = '';
+    if (!res.rows) {
+      const msg = res.why === 'signin' ? 'Sign in to see the versions kept on the account.'
+        : res.why === 'missing' ? 'The account keeps history once history.sql has been run. See SETUP.md.'
+        : 'Could not reach the account just now.';
+      srv.append(h('div.bakempty', {}, msg));
+      return;
+    }
+    if (!res.rows.length) {
+      srv.append(h('div.bakempty', {}, 'Nothing yet. A version is kept every time the account’s board is overwritten.'));
+      return;
+    }
+    for (const row of res.rows) {
+      const s = row.data || {};
+      srv.append(bakRow(fmtFull(Date.parse(row.replaced_at)), bakCounts(s), 'kept by the account', () => {
+        closeModal();
+        stashBoard('what was on the board before the restore');
+        adoptRestoredBoard(s);
+      }));
+    }
+  });
+  const sheet = h('div.sheet', {}, h('div.ctab', { style: { background: 'var(--accent)' } }), body,
+    h('div.sfoot', {}, h('span'), h('button.btn.small', { onclick: closeModal }, 'Close')));
+  root.append(h('div.overlay', { onclick: closeModal }), sheet);
 }
 function wireMenu() {
   const pop = $('#menuPop');
@@ -1532,9 +1602,11 @@ function wireMenu() {
   $('#syncChip').addEventListener('click', openSettings);
   $('#mExport').addEventListener('click', () => { pop.classList.remove('open'); exportBackup(); });
   $('#mImport').addEventListener('click', () => { pop.classList.remove('open'); $('#importFile').click(); });
+  $('#mRestore').addEventListener('click', () => { pop.classList.remove('open'); openRestoreSheet(); });
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
   $('#mReset').addEventListener('click', () => {
     pop.classList.remove('open');
+    stashBoard('before Clear everything');
     undoableAction('Board cleared. Your account is untouched', () => { STATE = blankState(); });
   });
 }
@@ -1791,6 +1863,76 @@ function schedulePush() {
   SB.pushTimer = setTimeout(() => syncNow(), 2000);
 }
 let syncing = false;
+let forcePushOnce = false;   // a just-restored board beats whatever the server holds, once
+/* ---------- on-device board backups ---------- */
+// Three slots, kept on this device, written every time the board is about to be replaced
+// wholesale: by the account copy, by an import, or by Clear everything. `latest` is always
+// the newest pre-replacement board; `daily` is the first one from each calendar day, so a
+// day of ordinary syncing cannot rotate yesterday away; `shrink` is written only when the
+// incoming board holds less than half of what this one does, which is the shape of a
+// disaster rather than of tidying up. Restore lives in the menu.
+const BAK_KEYS = { latest: 'dayu-bak-latest', daily: 'dayu-bak-daily', shrink: 'dayu-bak-shrink' };
+function boardBulk(s) {
+  return (s && s.notes ? s.notes.length : 0) + (s && s.zones ? s.zones.length : 0)
+    + (s && s.routines ? s.routines.length : 0);
+}
+function stashBoard(reason, incoming) {
+  try {
+    if (!STATE || !boardBulk(STATE)) return;
+    const pack = JSON.stringify({ at: Date.now(), reason, board: STATE });
+    storeSet(BAK_KEYS.latest, pack);
+    const daily = readBak(BAK_KEYS.daily);
+    if (!daily || dayKey(daily.at) !== todayKey()) storeSet(BAK_KEYS.daily, pack);
+    if (incoming && boardBulk(incoming) < boardBulk(STATE) / 2) storeSet(BAK_KEYS.shrink, pack);
+  } catch (e) { /* a full store must never block a sync */ }
+}
+function readBak(key) {
+  try {
+    const b = JSON.parse(storeGet(key) || 'null');
+    return b && b.board && Array.isArray(b.board.notes) ? b : null;
+  } catch (e) { return null; }
+}
+function listBackups() {
+  const out = [];
+  for (const [slot, key] of Object.entries(BAK_KEYS)) {
+    const b = readBak(key);
+    if (b) out.push({ slot, key, at: b.at, reason: b.reason, board: b.board });
+  }
+  return out.sort((a, b) => b.at - a.at);
+}
+// Bring a backup onto the board and up to the account. Stamped as of right now, or the
+// next sync would immediately pull the very board it was rescuing us from.
+// Bring a rescued board onto this device and up to the account. Stamped as of right now
+// and pushed with forcePushOnce, so it wins even against a device whose clock runs fast.
+function adoptRestoredBoard(board) {
+  STATE = migrate(JSON.parse(JSON.stringify(board)));
+  STATE.meta.updatedAt = Date.now();
+  returningUser = true;              // a restored board is deliberate work, never a starter
+  forcePushOnce = true;              // and it wins the next sync outright
+  storeSet(STORE_KEY, JSON.stringify(STATE));
+  save();
+  renderAll();
+  syncNow();
+  toast('Board restored. It will sync up as this account’s copy');
+}
+function restoreBackup(key) {
+  const b = readBak(key);
+  if (!b) { toast('That backup could not be read'); return false; }
+  stashBoard('what was on the board before the restore');
+  adoptRestoredBoard(b.board);
+  return true;
+}
+// The account's own history: the database files the outgoing board away on every
+// overwrite (history.sql), so any device can reach back past a bad write.
+async function listServerHistory() {
+  if (!signedIn() || !SB.access) return { rows: null, why: 'signin' };
+  const r = await sbFetch('/rest/v1/dayu_state_history?select=hid,data,replaced_at&order=replaced_at.desc&limit=30').catch(() => null);
+  if (!r) return { rows: null, why: 'offline' };
+  if (r.status === 404) return { rows: null, why: 'missing' };
+  if (!r.ok) return { rows: null, why: 'http' + r.status };
+  const rows = await r.json().catch(() => null);
+  return { rows: Array.isArray(rows) ? rows : null, why: '' };
+}
 async function syncNow() {
   if (!sbConfigured()) { syncStatus('local'); return; }
   if (!SB.access) {
@@ -1817,20 +1959,71 @@ async function syncNow() {
     const editing = $('.note textarea');
     const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging
       || (editing && document.activeElement === editing);
-    if (remote && remoteTs > localTs + 500 && !busy) {
+    // A board seeded THIS visit is not this person's work: it is the starter board, stamped
+    // with the moment it was invented, which makes it look newer than the account's real
+    // board. Newest-wins must never apply to it. A fresh browser signing in to an account
+    // that has a board ADOPTS that board, whatever the clocks say; it may push only into an
+    // account that has nothing at all. This exact hole once let a phone's starter board
+    // overwrite months of work everywhere.
+    const freshBoard = !returningUser;
+    // A restore must win outright. Clocks on two devices can disagree, so the board that
+    // was just deliberately restored is pushed with a stamp later than whatever the server
+    // holds, rather than trusting this machine's idea of "now" to be newer.
+    if (forcePushOnce) {
+      const stamp = Math.max(localTs || Date.now(), remoteTs + 1000);
+      const pr = await sbFetch('/rest/v1/dayu_state', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(stamp).toISOString() }]),
+      });
+      if (pr.ok) {
+        forcePushOnce = false;
+        STATE.meta.updatedAt = stamp;
+        storeSet(STORE_KEY, JSON.stringify(STATE));
+        CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok');
+      } else syncStatus('err', 'Push failed: HTTP ' + pr.status);
+    } else if (remote && freshBoard && !busy) {
+      stashBoard('what this browser held before its first sign-in', remote.data);
+      STATE = migrate(remote.data);
+      STATE.meta.updatedAt = remoteTs || Date.now();
+      returningUser = true;                     // from here on this board is the stored one
+      storeSet(STORE_KEY, JSON.stringify(STATE));
+      renderAll();
+      CFG.lastSyncAt = Date.now(); saveCfg();
+      syncStatus('ok');
+    } else if (remote && remoteTs > localTs + 500 && !busy) {
+      // Whatever is about to be replaced is kept on this device first, so one bad write
+      // can always be walked back from the menu's Restore a backup.
+      const prevBulk = boardBulk(STATE);
+      stashBoard('replaced by the account copy', remote.data);
       STATE = migrate(remote.data);
       STATE.meta.updatedAt = remoteTs;
       storeSet(STORE_KEY, JSON.stringify(STATE));
       renderAll();
       CFG.lastSyncAt = Date.now(); saveCfg();
       syncStatus('ok');
-    } else if (!remote || localTs > remoteTs + 500) {
+      // A board that arrives holding less than half of what it replaces is the shape of an
+      // accident. The replaced board is already stashed; say so where it can be seen, since
+      // a person staring at a suddenly empty canvas should not have to guess.
+      if (prevBulk >= 6 && boardBulk(STATE) < prevBulk / 2) {
+        toast('This device just received a much smaller board. The one it replaced is under Menu, Restore a backup', null, 15000);
+      }
+    } else if ((!remote || localTs > remoteTs + 500) && !freshBoard) {
       const pr = await sbFetch('/rest/v1/dayu_state', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(localTs || Date.now()).toISOString() }]),
       });
       if (pr.ok) { CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok'); }
+      else syncStatus('err', 'Push failed: HTTP ' + pr.status);
+    } else if (!remote && freshBoard) {
+      // A brand-new account: the starter board is all there is, and it may go up.
+      const pr = await sbFetch('/rest/v1/dayu_state', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(localTs || Date.now()).toISOString() }]),
+      });
+      if (pr.ok) { returningUser = true; CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok'); }
       else syncStatus('err', 'Push failed: HTTP ' + pr.status);
     } else {
       syncStatus('ok');
