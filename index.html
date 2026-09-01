@@ -7,7 +7,7 @@
   --paper:#F5F2E9; --dots:#DAD4C2; --surface:#FFFFFF; --raise:#FBFAF5;
   --ink:#17161B; --ink2:#5D5B64; --ink3:#93909B; --line:#E4E0D2; --line2:#D2CDBB;
   --accent:#2B3FD6; --accent-hover:#1F2FA8; --accent-ink:#FFFFFF; --accent-soft:rgba(43,63,214,.09);
-  --good:#187A48; --warn:#B4790E; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08); --rest:#1C86D6; --sun:#9A6206; --star:#C2410C; --star-soft:rgba(194,65,12,.10); --star-ink:#FFFFFF;
+  --good:#187A48; --warn:#B4790E; --danger:#C63A45; --danger-soft:rgba(198,58,69,.08); --rest:#1C86D6; --work:#146B4A; --work-soft:rgba(20,107,74,.10); --sun:#9A6206; --star:#C2410C; --star-soft:rgba(194,65,12,.10); --star-ink:#FFFFFF;
   --shadow:0 1px 2px rgba(23,22,27,.07),0 8px 22px rgba(23,22,27,.11);
   --shadow-big:0 4px 10px rgba(23,22,27,.10),0 24px 60px rgba(23,22,27,.22);
   --note-ink:#262212; --note-ink2:rgba(38,34,18,.62);
@@ -17,7 +17,7 @@
     --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
     --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
     --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-    --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0; --sun:#E9B44C; --star:#F5A06A; --star-soft:rgba(245,160,106,.13); --star-ink:#2A1404;
+    --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0; --work:#5FCC96; --work-soft:rgba(95,204,150,.13); --sun:#E9B44C; --star:#F5A06A; --star-soft:rgba(245,160,106,.13); --star-ink:#2A1404;
     --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
     --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
   }
@@ -26,7 +26,7 @@
   --paper:#1C1B20; --dots:#2C2B33; --surface:#26252C; --raise:#2C2B33;
   --ink:#F1EFE9; --ink2:#A9A6B1; --ink3:#77747F; --line:#37363F; --line2:#434250;
   --accent:#8D99FF; --accent-hover:#A9B2FF; --accent-ink:#12142B; --accent-soft:rgba(141,153,255,.13);
-  --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0; --sun:#E9B44C; --star:#F5A06A; --star-soft:rgba(245,160,106,.13); --star-ink:#2A1404;
+  --good:#53C98D; --warn:#E3B341; --danger:#F08089; --danger-soft:rgba(240,128,137,.10); --rest:#5FBBF0; --work:#5FCC96; --work-soft:rgba(95,204,150,.13); --sun:#E9B44C; --star:#F5A06A; --star-soft:rgba(245,160,106,.13); --star-ink:#2A1404;
   --shadow:0 1px 2px rgba(0,0,0,.25),0 8px 22px rgba(0,0,0,.35);
   --shadow-big:0 4px 10px rgba(0,0,0,.3),0 24px 60px rgba(0,0,0,.5);
 }
@@ -57,6 +57,9 @@ input,select,textarea{font:inherit;color:var(--ink)}
 .wordmark{display:flex;align-items:center;gap:8px;font-weight:800;font-size:17px;letter-spacing:-.02em;user-select:none}
 .wordmark .pin{width:20px;height:20px;display:block}
 .tabs{display:flex;gap:2px}
+/* Archive and the Dashboard are places you go to look back, not places you work, so they
+   sit apart from the three working pages at the other end of the bar. */
+.tabs-end{margin-left:auto}
 .tab{
   padding:6px 12px;border-radius:8px;font-weight:600;color:var(--ink2);
   text-decoration:none;font-size:13.5px;
@@ -67,7 +70,7 @@ input,select,textarea{font:inherit;color:var(--ink)}
 .tabbadge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;
   padding:0 4px;margin-left:6px;border-radius:999px;background:var(--danger);color:var(--paper);
   font-size:10px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;vertical-align:1px}
-#meters{margin-left:auto;display:flex;align-items:center;gap:14px}
+#meters{display:flex;align-items:center;gap:14px}
 .meter{display:flex;flex-direction:column;gap:3px;min-width:96px;cursor:pointer;border-radius:6px;padding:2px 4px}
 .meter:hover{background:var(--accent-soft)}
 .meter .mlabel{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px}
@@ -206,7 +209,13 @@ main{flex:1;min-height:0;position:relative}
 #starPanel .tpCount{background:var(--star);color:var(--star-ink)}
 #starPanel .tpBody{max-height:260px}
 #starPanel .tpTag{color:var(--sun)}
-#todayPanel .tpTag{color:var(--star)}
+/* Currently working on: one task, so it wears the doing colour rather than a count */
+#workPanel .tpHead:hover,#workPanel .tpRow:hover{background:var(--work-soft)}
+/* One row at most, and it is the point of the panel: never the one that gives way when
+   the column runs out of room on a small screen. */
+#workPanel{flex:0 0 auto}
+#workPanel .tpBody{max-height:none}
+#workPanel .tpTitle{color:var(--work)}
 @media (max-width:620px){
   /* Kept under the 45% band fitInset() reserves for these panels, so Fit can never park a
      task in a strip the panels are actually covering. Change one and change the other. */
@@ -239,22 +248,28 @@ main{flex:1;min-height:0;position:relative}
 /* the one-press marks, kept out of the way until the task is hovered. Each keeps its own
    slot in the corner, so a lit one never shifts when the other one appears. */
 .note .nbtns{position:absolute;right:4px;top:5px;display:flex;flex-direction:column;gap:2px;align-items:center}
-.note .todaybtn,.note .starbtn{
+.note .workbtn,.note .starbtn{
   width:19px;height:19px;padding:0;border-radius:50%;flex:0 0 auto;
   display:flex;align-items:center;justify-content:center;color:var(--note-ink2);
   opacity:0;pointer-events:none;transition:opacity .12s ease;
 }
-.note .todaybtn svg,.note .starbtn svg{width:14px;height:14px;display:block}
+.note .workbtn svg,.note .starbtn svg{width:14px;height:14px;display:block}
 /* Invisible must also mean untouchable, or a tap in that corner hits a target nobody can see. */
-.note:hover .todaybtn,.note:hover .starbtn{opacity:.5;pointer-events:auto}
-.note .todaybtn:hover,.note .starbtn:hover{opacity:1;background:rgba(255,255,255,.55)}
-.note .todaybtn.on{opacity:1;pointer-events:auto;color:#9A6206}
+.note:hover .workbtn,.note:hover .starbtn{opacity:.5;pointer-events:auto}
+.note .workbtn:hover,.note .starbtn:hover{opacity:1;background:rgba(255,255,255,.55)}
+.note .workbtn.on{opacity:1;pointer-events:auto;color:#0E6B45}
 .note .starbtn.on{opacity:1;pointer-events:auto;color:#B4400C}
-.note .todaybtn:focus-visible,.note .starbtn:focus-visible{opacity:1;pointer-events:auto}
+.note .workbtn:focus-visible,.note .starbtn:focus-visible{opacity:1;pointer-events:auto}
+/* A high-priority task stands out where it sits, so it can be picked out among its
+   neighbours inside a cluster without opening or reading anything. */
+.note.starred{outline:2.5px solid var(--star);outline-offset:2px}
+/* The one task in hand wins the ring when it is starred as well. Declared after, so equal
+   specificity resolves in its favour. */
+.note.working{outline:2.5px solid var(--work);outline-offset:2px}
 /* No hover to reveal them on a touch screen, so they are simply always there, and bigger. */
 @media (hover:none){
   .note .nbtns{right:2px;top:4px}
-  .note .todaybtn,.note .starbtn{opacity:.45;pointer-events:auto;width:24px;height:24px}
+  .note .workbtn,.note .starbtn{opacity:.45;pointer-events:auto;width:24px;height:24px}
 }
 .note.flash{animation:noteflash 1s ease}
 @keyframes noteflash{0%,100%{box-shadow:0 1px 2px rgba(23,22,27,.14),0 5px 12px rgba(23,22,27,.14)}30%,60%{box-shadow:0 0 0 3px var(--accent),0 8px 20px rgba(23,22,27,.28)}}
@@ -812,11 +827,16 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
   #topbar{gap:6px;padding:0 8px}
   .wordmark span{display:none}
   #meters{display:none}          /* the Goals and Dashboard pages carry the same numbers */
-  /* Five tabs no longer fit on a phone. The strip slides sideways rather than shouldering
-     the menu and theme buttons off the end of the bar, where nothing could reach them. */
-  .tabs{margin-right:auto;min-width:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+  /* Five tabs in two groups do not fit on a phone. Each strip slides sideways rather than
+     shouldering the menu and theme buttons off the end of the bar, where nothing could
+     reach them. The right-hand group keeps its own width so it is never squeezed to
+     nothing by the left one. */
+  .tabs{min-width:0;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
   .tabs::-webkit-scrollbar{display:none}
   .tabs .tab{padding:6px 5px;font-size:12.5px;flex:0 0 auto}
+  /* No room to hold the two groups apart at this width, so they share what there is and
+     each slides; go() scrolls whichever page you opened back into view. */
+  .tabs-end{flex:0 1 auto}
 }
 </style>
 
@@ -829,8 +849,10 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
     <nav class="tabs">
       <a class="tab" href="#canvas" data-page="canvas">Canvas</a>
       <a class="tab" href="#routines" data-page="routines">Routines</a>
-      <a class="tab" href="#archive" data-page="archive">Archive</a>
       <a class="tab" href="#goals" data-page="goals">Goals</a>
+    </nav>
+    <nav class="tabs tabs-end">
+      <a class="tab" href="#archive" data-page="archive">Archive</a>
       <a class="tab" href="#dashboard" data-page="dashboard">Dashboard</a>
     </nav>
     <div id="meters" title="Progress today. Click to manage goals"></div>
@@ -858,7 +880,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
         </div>
       </div>
       <div id="panelStack">
-        <div id="todayPanel" class="sidepanel"></div>
+        <div id="workPanel" class="sidepanel"></div>
         <div id="starPanel" class="sidepanel"></div>
       </div>
       <div id="toolbar">
@@ -1044,7 +1066,12 @@ function wireTheme() {
 let STATE = null;
 let saveTimer = null;
 function save() {
-  if (STATE.meta) STATE.meta.updatedAt = Date.now();
+  if (STATE.meta) {
+    STATE.meta.updatedAt = Date.now();
+    saveGen++;
+    // The first real change makes this the user's board rather than the starter one.
+    delete STATE.meta.seeded;
+  }
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => storeSet(STORE_KEY, JSON.stringify(STATE)), 250);
   schedulePush();
@@ -1054,7 +1081,7 @@ function save() {
 const R_MIN_W = 240, R_MIN_H = 150;
 function blankState() {
   return {
-    v: 6, notes: [], cats: [], zones: [], links: [], routines: [], goals: [], wishes: [], habits: [], zTop: 10,
+    v: 6, notes: [], cats: [], zones: [], links: [], routines: [], goals: [], wishes: [], habits: [], zTop: 10, workingOn: null,
     meta: { updatedAt: Date.now() },
   };
 }
@@ -1079,6 +1106,9 @@ function migrate(s) {
     r.w = Math.max(R_MIN_W, Number(r.w) || R_MIN_W);
     r.h = Math.max(R_MIN_H, Number(r.h) || R_MIN_H);
   }
+  // "Currently working on" is one id, or nothing. An id naming a task this board no longer
+  // has is nothing.
+  if (typeof s.workingOn !== 'string' || !s.notes.some(n => n.id === s.workingOn)) s.workingOn = null;
   if (!Array.isArray(s.wishes)) s.wishes = [];
   if (!Array.isArray(s.goals)) s.goals = [];
   if (!Array.isArray(s.cats)) s.cats = [];
@@ -1120,6 +1150,9 @@ function migrate(s) {
 }
 function seedState() {
   const s = blankState();
+  // This board was invented, not written. Until someone changes something it must never
+  // outrank an account's real board, however new its timestamp looks.
+  s.meta.seeded = true;
   const now = Date.now();
   const catStart = { id: uid(), name: 'Getting started', color: 'sky' };
   s.cats.push(catStart);
@@ -1398,13 +1431,21 @@ function toast(msg, undoFn, ms) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { root.innerHTML = ''; }, ms || (undoFn ? 6000 : 2600));
 }
+// Every save bumps this. An Undo offer is only good while nothing else has been saved
+// since: the snapshot is the WHOLE board, so replaying it over later work would silently
+// throw that work away.
+let saveGen = 0;
 function snapshot() { return JSON.stringify(STATE); }
 function restore(snap) { STATE = JSON.parse(snap); save(); renderAll(); }
 function undoableAction(msg, mutate) {
   const snap = snapshot();
   mutate();
   save(); renderAll();
-  toast(msg, () => restore(snap));
+  const gen = saveGen;
+  toast(msg, () => {
+    if (saveGen !== gen) { toast('The board has changed since then. Menu, Restore a backup has the older copies', null, 6000); return; }
+    restore(snap);
+  });
 }
 
 /* ---------- gamification helpers ---------- */
@@ -1612,10 +1653,14 @@ function wireMenu() {
   $('#mImport').addEventListener('click', () => { pop.classList.remove('open'); $('#importFile').click(); });
   $('#mRestore').addEventListener('click', () => { pop.classList.remove('open'); openRestoreSheet(); });
   $('#importFile').addEventListener('change', e => { if (e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ''; });
-  $('#mReset').addEventListener('click', () => {
+  $('#mReset').addEventListener('click', e => {
     pop.classList.remove('open');
-    stashBoard('before Clear everything');
-    undoableAction('Board cleared. Your account is untouched', () => { STATE = blankState(); });
+    // One click used to empty the board outright, and the toast claimed the account was
+    // safe: it is not, because the clear is saved and pushed like any other change.
+    askDelete(e, 'everything on this board', () => {
+      stashBoard('before Clear everything');
+      undoableAction('Board cleared. This also clears it on your account', () => { STATE = blankState(); });
+    });
   });
 }
 
@@ -1630,7 +1675,7 @@ const SB_DEFAULTS = {
   url: 'https://pzpaogsadtjmefiuhauy.supabase.co',
   anon: 'sb_publishable_Uvg27Wf778Lk0aGWUOXIiA_dLHrQvOt',
 };
-let CFG = { sbUrl: '', sbAnon: '', sbEmail: '', sbRefresh: '', lastUserId: '', lastSyncAt: 0 };
+let CFG = { sbUrl: '', sbAnon: '', sbEmail: '', sbRefresh: '', lastUserId: '', syncedWith: '', lastSyncAt: 0 };
 (function loadCfg() {
   try { const raw = storeGet(CFG_KEY) || storeGet('tack-cfg-v1'); if (raw) Object.assign(CFG, JSON.parse(raw)); } catch (e) { /* fresh */ }
   if (!CFG.sbUrl && SB_DEFAULTS.url) CFG.sbUrl = SB_DEFAULTS.url;
@@ -1967,72 +2012,76 @@ async function syncNow() {
     const editing = $('.note textarea');
     const busy = modalNoteId || $('#modalRoot').classList.contains('open') || zoneDragging
       || (editing && document.activeElement === editing);
-    // A board seeded THIS visit is not this person's work: it is the starter board, stamped
-    // with the moment it was invented, which makes it look newer than the account's real
-    // board. Newest-wins must never apply to it. A fresh browser signing in to an account
-    // that has a board ADOPTS that board, whatever the clocks say; it may push only into an
-    // account that has nothing at all. This exact hole once let a phone's starter board
-    // overwrite months of work everywhere.
-    const freshBoard = !returningUser;
-    // A restore must win outright. Clocks on two devices can disagree, so the board that
-    // was just deliberately restored is pushed with a stamp later than whatever the server
-    // holds, rather than trusting this machine's idea of "now" to be newer.
-    if (forcePushOnce) {
-      const stamp = Math.max(localTs || Date.now(), remoteTs + 1000);
+    // FIRST CONTACT is the thing that actually matters, and it must not be inferred from
+    // the board on this screen. `returningUser` cannot carry it: signing in with Google is
+    // a full page navigation, so the callback arrives as a NEW page load which reads the
+    // starter board back out of storage and calls itself a returning user. The guard that
+    // used to live here was therefore dead on the one path it was written for.
+    //
+    // `CFG.syncedWith` records the account this DEVICE has actually exchanged a board with,
+    // and it is stored beside the refresh token, so it survives that navigation. Until this
+    // device has traded boards with this account, the account's copy wins outright: a device
+    // that has never synced may adopt, never overwrite.
+    const mine = myId();
+    const firstContact = !mine || CFG.syncedWith !== mine;
+    // Belt and braces for the case where the board is lost but the config is not: a starter
+    // board nobody has touched must never overwrite anything, whatever the clocks say.
+    const untouchedSeed = !!(STATE.meta && STATE.meta.seeded);
+    const markSynced = () => { if (mine) { CFG.syncedWith = mine; } CFG.lastSyncAt = Date.now(); saveCfg(); };
+    const adopt = (why, warnOnShrink) => {
+      const prevBulk = boardBulk(STATE);
+      stashBoard(why, remote.data);
+      STATE = migrate(remote.data);
+      STATE.meta.updatedAt = remoteTs || Date.now();
+      delete STATE.meta.seeded;                 // this is the account's real board now
+      // The shared caches describe the board that was just thrown away. Left standing, the
+      // syncShared that runs moments later would find the adopted copy "different from what
+      // I last pushed" and upload it over a shared cluster that may be newer.
+      SH.seen = {}; SH.pushed = {};
+      returningUser = true;
+      storeSet(STORE_KEY, JSON.stringify(STATE));
+      renderAll();
+      markSynced();
+      syncStatus('ok');
+      // A board that arrives holding less than half of what it replaces is the shape of an
+      // accident. The replaced board is already stashed; say so where it can be seen, since
+      // a person staring at a suddenly empty canvas should not have to guess.
+      if (warnOnShrink && prevBulk >= 6 && boardBulk(STATE) < prevBulk / 2) {
+        toast('This device just received a much smaller board. The one it replaced is under Menu, Restore a backup', null, 15000);
+      }
+    };
+    const push = async stamp => {
       const pr = await sbFetch('/rest/v1/dayu_state', {
         method: 'POST',
         headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
         body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(stamp).toISOString() }]),
       });
-      if (pr.ok) {
+      if (!pr.ok) { syncStatus('err', 'Push failed: HTTP ' + pr.status); return false; }
+      markSynced();
+      syncStatus('ok');
+      return true;
+    };
+    // A restore must win outright. Clocks on two devices can disagree, so the board that
+    // was just deliberately restored is pushed with a stamp later than whatever the server
+    // holds, rather than trusting this machine's idea of "now" to be newer.
+    if (forcePushOnce) {
+      const stamp = Math.max(localTs || Date.now(), remoteTs + 1000);
+      if (await push(stamp)) {
         forcePushOnce = false;
         STATE.meta.updatedAt = stamp;
+        delete STATE.meta.seeded;
         storeSet(STORE_KEY, JSON.stringify(STATE));
-        CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok');
-      } else syncStatus('err', 'Push failed: HTTP ' + pr.status);
-    } else if (remote && freshBoard && !busy) {
-      stashBoard('what this browser held before its first sign-in', remote.data);
-      STATE = migrate(remote.data);
-      STATE.meta.updatedAt = remoteTs || Date.now();
-      returningUser = true;                     // from here on this board is the stored one
-      storeSet(STORE_KEY, JSON.stringify(STATE));
-      renderAll();
-      CFG.lastSyncAt = Date.now(); saveCfg();
-      syncStatus('ok');
-    } else if (remote && remoteTs > localTs + 500 && !busy) {
-      // Whatever is about to be replaced is kept on this device first, so one bad write
-      // can always be walked back from the menu's Restore a backup.
-      const prevBulk = boardBulk(STATE);
-      stashBoard('replaced by the account copy', remote.data);
-      STATE = migrate(remote.data);
-      STATE.meta.updatedAt = remoteTs;
-      storeSet(STORE_KEY, JSON.stringify(STATE));
-      renderAll();
-      CFG.lastSyncAt = Date.now(); saveCfg();
-      syncStatus('ok');
-      // A board that arrives holding less than half of what it replaces is the shape of an
-      // accident. The replaced board is already stashed; say so where it can be seen, since
-      // a person staring at a suddenly empty canvas should not have to guess.
-      if (prevBulk >= 6 && boardBulk(STATE) < prevBulk / 2) {
-        toast('This device just received a much smaller board. The one it replaced is under Menu, Restore a backup', null, 15000);
       }
-    } else if ((!remote || localTs > remoteTs + 500) && !freshBoard) {
-      const pr = await sbFetch('/rest/v1/dayu_state', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(localTs || Date.now()).toISOString() }]),
-      });
-      if (pr.ok) { CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok'); }
-      else syncStatus('err', 'Push failed: HTTP ' + pr.status);
-    } else if (!remote && freshBoard) {
-      // A brand-new account: the starter board is all there is, and it may go up.
-      const pr = await sbFetch('/rest/v1/dayu_state', {
-        method: 'POST',
-        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-        body: JSON.stringify([{ id: 'main', data: STATE, updated_at: new Date(localTs || Date.now()).toISOString() }]),
-      });
-      if (pr.ok) { returningUser = true; CFG.lastSyncAt = Date.now(); saveCfg(); syncStatus('ok'); }
-      else syncStatus('err', 'Push failed: HTTP ' + pr.status);
+    } else if (remote && (firstContact || untouchedSeed) && !busy) {
+      adopt('what this browser held before its first sign-in', false);
+    } else if (remote && remoteTs > localTs + 500 && !busy) {
+      adopt('replaced by the account copy', true);
+    } else if (remote && (firstContact || untouchedSeed)) {
+      // The account has a board and this device may not push over it, but something is in
+      // the way of adopting right now. Leave both alone and come back to it.
+      syncStatus('ok');
+    } else if (!remote || localTs > remoteTs + 500) {
+      await push(localTs || Date.now());
     } else {
       syncStatus('ok');
     }
@@ -2471,9 +2520,8 @@ function mergeSharedRow(row) {
     keep[t.id] = true;
     let n = noteById(t.id);
     if (!n) { n = { id: t.id, x: 0, y: 0, z: ++STATE.zTop, steps: [] }; STATE.notes.push(n); }
-    // The two board lists are each person's own: a friend starring a shared task, or
-    // lining it up for their day, says nothing about mine.
-    const mine = n.todayAt, mineStar = n.starredAt;
+    // The star is each person's own: a friend starring a shared task says nothing about mine.
+    const mineStar = n.starredAt;
     n.title = t.title || ''; n.desc = t.desc || '';
     if (t.images) n.images = t.images; else delete n.images;
     n.steps = Array.isArray(t.steps) ? t.steps : [];
@@ -2482,10 +2530,16 @@ function mergeSharedRow(row) {
     n.createdAt = t.createdAt || Date.now();
     n.catId = catId; n.sharedId = row.id;
     n.x = z.x + (Number(t.rx) || 0); n.y = z.y + (Number(t.ry) || 0);
-    if (mine) n.todayAt = mine; else delete n.todayAt;
     if (mineStar) n.starredAt = mineStar; else delete n.starredAt;
   }
-  STATE.notes = STATE.notes.filter(n => n.sharedId !== row.id || keep[n.id]);
+  // A task the server copy does not mention is UNSHARED, not deleted. It used to be
+  // filtered straight out of the board, which meant a push that never landed, or a first
+  // merge after a reload (SH.seen is memory-only and starts empty), could quietly destroy
+  // work nobody had uploaded yet. A stray task left behind is a nuisance; a deleted one is
+  // not recoverable from here.
+  for (const n of STATE.notes) {
+    if (n.sharedId === row.id && !keep[n.id]) { delete n.sharedId; n.catId = null; }
+  }
 }
 // The cluster is gone for us: the owner binned it, or we were shown out. Its tasks go with
 // it, since they were never ours to keep.
@@ -2737,8 +2791,25 @@ function notesInCat(catId) { return STATE.notes.filter(n => !n.archived && n.cat
 
 function noteBg(n) { const c = catById(n.catId); return c ? palById(c.color).bg : DEFAULT_NOTE_BG; }
 
+// Take whatever is in an open title box into the note WITHOUT redrawing, for callers that
+// are about to redraw anyway. renderCanvas tears every card out of the document, and on
+// Chrome and Safari that fires no blur, so without this the typing simply vanished; on
+// Firefox the blur arrived mid-removal and re-entered the render. One choke point closes
+// every path: a drag, a mark, a completion, a sync, a day flip.
+function harvestOpenNoteEditor() {
+  const ta = $('.note textarea');
+  if (!ta) return;
+  const noteEl = ta.closest('.note');
+  const n = noteEl && noteById(noteEl.dataset.id);
+  if (!n || !n.editing) return;
+  delete n.editing;
+  n.title = ta.value.trim();
+  if (!n.title) STATE.notes = STATE.notes.filter(x => x.id !== n.id);
+  save();
+}
 /* ---------- canvas render ---------- */
 function renderCanvas() {
+  harvestOpenNoteEditor();
   const field = $('#field'), board = $('#board');
   $$('.note, .zone', field).forEach(el => el.remove()); // popovers live on the body, untouched by a redraw
   $$('.hint', board).forEach(el => el.remove());
@@ -2754,6 +2825,8 @@ function renderCanvas() {
     const kept = STATE.links.filter(l => ids.has(l.from) && ids.has(l.to));
     if (kept.length !== STATE.links.length) { STATE.links = kept; save(); }
   }
+  // A task that has been deleted is not what anyone is working on.
+  if (STATE.workingOn && !STATE.notes.some(n => n.id === STATE.workingOn)) { STATE.workingOn = null; save(); }
   renderLinks();
 
   renderedDay = todayKey();
@@ -2768,30 +2841,14 @@ function renderCanvas() {
   }
 }
 
-/* ---------- the board's two lists: "Today I want to…" and "High priority" ---------- */
+/* ---------- the board's lists: "Currently working on" and "High priority" ---------- */
 // A task on either list is still exactly where you left it on the canvas: the list holds a
-// pointer to it, never a copy. Today's mark carries the day it was made, so that list
-// empties itself overnight and "today" keeps meaning today. A star carries no day: it stays
-// until you take it off, or until the task is finished.
-const TODAY_COLLAPSE_KEY = 'dayu-today-collapsed';
+// pointer to it, never a copy. Neither mark carries a day, so neither expires overnight:
+// a star stays until you take it off or the task is finished.
 const STAR_COLLAPSE_KEY = 'dayu-star-collapsed';
-function sunSvg(on) {
-  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">'
-    + '<circle cx="12" cy="12" r="4"' + (on ? ' fill="currentColor"' : '') + '/>'
-    + '<path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/></svg>';
-}
 function starSvg(on) {
   return '<svg viewBox="0 0 24 24" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'
     + '<path d="M12 2.6l3.03 6.14 6.77.99-4.9 4.77 1.16 6.75L12 18.06l-6.06 3.19 1.16-6.75-4.9-4.77 6.77-.99z"/></svg>';
-}
-function isToday(n) {
-  return !!n.todayAt && !n.archived && !n.completedAt && dayKey(n.todayAt) === todayKey();
-}
-function todayNotes() { return STATE.notes.filter(isToday).sort((a, b) => a.todayAt - b.todayAt); }
-function setToday(n, on) {
-  n.todayAt = on ? Date.now() : null;
-  save();
-  renderCanvas();
 }
 // A star is the standing "this one matters most" mark. Nothing about it expires, so ticking
 // the task off is what takes it out of the list; un-ticking it puts it back.
@@ -2799,6 +2856,27 @@ function isStarred(n) { return !!n.starredAt && !n.archived && !n.completedAt; }
 function starredNotes() { return STATE.notes.filter(isStarred).sort((a, b) => a.starredAt - b.starredAt); }
 function setStarred(n, on) {
   n.starredAt = on ? Date.now() : null;
+  save();
+  renderCanvas();
+}
+// One task at a time, and that is the whole point of it: the limit is what makes the panel
+// mean anything. It lives in STATE rather than on the note, so "only one" is a property of
+// the board and not a rule that has to be enforced by sweeping the other notes.
+const WORK_COLLAPSE_KEY = 'dayu-work-collapsed';
+function workSvg(on) {
+  return '<svg viewBox="0 0 24 24" fill="' + (on ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'
+    + '<path d="M8 5.6l10 6.4-10 6.4z"/></svg>';
+}
+function isWorking(n) { return !!n && STATE.workingOn === n.id && !n.archived && !n.completedAt; }
+function workingNote() {
+  const n = STATE.workingOn ? noteById(STATE.workingOn) : null;
+  return isWorking(n) ? n : null;
+}
+function workingNotes() { const n = workingNote(); return n ? [n] : []; }
+// Picking one up puts the previous one down. Nothing is lost by that: the task keeps every
+// other mark it had, and is still exactly where it was on the canvas.
+function setWorking(n, on) {
+  STATE.workingOn = on ? n.id : null;
   save();
   renderCanvas();
 }
@@ -2824,12 +2902,13 @@ let renderedDay = '';
 let dayTimer = null;
 function dayFlipCheck() {
   if (todayKey() === renderedDay) return;
-  // Finish any title being typed first. Rebuilding the board would tear the textarea out
-  // mid-edit, which fires its blur listener inside the removal loop and throws.
-  commitOpenNoteEditor();
-  // Never rebuild the canvas out from under an open sheet or a gesture in progress.
+  // Never rebuild out from under an open sheet or a gesture in progress.
   if (modalNoteId || zoneDragging || $('.note.dragging')) { setTimeout(dayFlipCheck, 2000); return; }
-  renderCanvas();
+  // renderAll, not renderCanvas: the goal sheet, the meters and the archive all bake
+  // "today" into what they draw. A tab left on the Goals page across midnight used to keep
+  // yesterday's grid, so the highlighted column wrote into yesterday and the real today sat
+  // disabled with a "not yet" tooltip until the page was reloaded.
+  renderAll();
 }
 function scheduleDayFlip() {
   clearTimeout(dayTimer);
@@ -2840,15 +2919,16 @@ function scheduleDayFlip() {
 // The two panels are the same list of pointers behind a different mark, so one piece of code
 // draws both and they differ only in what they are told here. A task can carry both marks,
 // and each list quietly shows the other's mark when it does.
-const TODAY_PANEL = {
-  id: 'todayPanel',
-  key: TODAY_COLLAPSE_KEY,
-  title: 'Today I want to…',
-  show: 'Show today’s list',
-  hide: 'Hide today’s list',
-  off: 'Take it off today’s list',
-  list: todayNotes,
-  remove: n => setToday(n, false),
+const WORK_PANEL = {
+  id: 'workPanel',
+  key: WORK_COLLAPSE_KEY,
+  title: 'Currently working on',
+  show: 'Show what you are working on',
+  hide: 'Hide what you are working on',
+  off: 'Put it down',
+  noCount: true,                    // one at a time, so a number would say nothing
+  list: workingNotes,
+  remove: n => setWorking(n, false),
   tag: n => isStarred(n) ? h('span.tpTag', { title: 'Also starred as high priority', innerHTML: starSvg(true) }) : null,
 };
 const STAR_PANEL = {
@@ -2860,9 +2940,9 @@ const STAR_PANEL = {
   off: 'Take the star off',
   list: starredNotes,
   remove: n => setStarred(n, false),
-  tag: n => isToday(n) ? h('span.tpTag', { title: 'Also on today’s list', innerHTML: sunSvg(true) }) : null,
+  tag: n => isWorking(n) ? h('span.tpTag', { title: 'The one you are working on', innerHTML: workSvg(true) }) : null,
 };
-function renderSidePanels() { renderPanel(TODAY_PANEL); renderPanel(STAR_PANEL); }
+function renderSidePanels() { renderPanel(WORK_PANEL); renderPanel(STAR_PANEL); }
 function renderPanel(cfg) {
   const box = $('#' + cfg.id);
   if (!box) return;
@@ -2879,7 +2959,7 @@ function renderPanel(cfg) {
   },
     h('span.tpChev', {}, collapsed ? '▸' : '▾'),
     h('span.tpTitle', {}, cfg.title),
-    list.length ? h('span.tpCount', {}, String(list.length)) : null));
+    (list.length && !cfg.noCount) ? h('span.tpCount', {}, String(list.length)) : null));
   if (collapsed) return;
   const body = h('div.tpBody');
   if (!list.length && cfg.empty) body.append(h('div.tpEmpty', {}, cfg.empty));
@@ -3033,7 +3113,7 @@ function buildZone(z) {
       h('span', {}, cat ? cat.name : '?'),
       h('span.zcount', {}, String(notesInCat(z.catId).length)),
       z.sharedId ? h('span.zshared', { title: 'Shared with ' + (sharedMemberIds(z.sharedId).map(displayName).join(', ') || 'a friend') }, '👥') : null,
-      h('button.zdel', { title: 'Remove this area (tasks keep their category)', onclick: e => { e.stopPropagation(); removeZone(z.id); } }, '✕')),
+      h('button.zdel', { title: 'Remove this cluster', onclick: e => { e.stopPropagation(); askDelete(e, zoneDeleteLabel(z), () => removeZone(z.id)); } }, '✕')),
     h('div.zresize', { title: 'Resize' }));
 
   // move zone by its name tag (its empty interior works too, handled on the field)
@@ -3132,6 +3212,13 @@ function startZoneDrag(z, e, grabEl, onClick) {
   window.addEventListener('pointerup', up);
   window.addEventListener('pointercancel', cancel);
 }
+// What the ✕ on a cluster will actually do, said plainly before it happens. A shared
+// cluster is not just an outline: removing it takes its tasks with it, and for its owner it
+// takes them from everyone. Neither of those is undoable, so neither happens on one click.
+function zoneDeleteLabel(z) {
+  if (!z.sharedId) return 'this cluster area';
+  return iOwnShared(z.sharedId) ? 'this shared cluster, for everyone' : 'this shared cluster (you leave it)';
+}
 function removeZone(id) {
   const z = STATE.zones.find(x => x.id === id);
   // A shared cluster is not just an outline on this screen: removing it has to mean either
@@ -3164,6 +3251,8 @@ function dragXY(e, elm, onMove, onUp) {
 function buildNote(n) {
   const el = h('div.note', { dataset: { id: n.id }, style: { left: n.x + 'px', top: n.y + 'px', background: noteBg(n), zIndex: n.z || 10 } });
   if (n.completedAt) el.classList.add('done');
+  if (isStarred(n)) el.classList.add('starred');
+  if (isWorking(n)) el.classList.add('working');   // findable at a glance on the plane
 
   const chk = h('button.chk', { title: n.completedAt ? 'Not done after all' : 'Done: sends it to the archive', innerHTML: TICK_SVG, onclick: e => { e.stopPropagation(); toggleDone(n.id); } });
   el.append(chk);
@@ -3172,6 +3261,9 @@ function buildNote(n) {
     el.classList.add('editing'); // no sun while typing, so the corner it reserves is given back
     const ta = h('textarea', { rows: 2, placeholder: 'What needs doing?', value: n.title });
     const commit = () => {
+      // Already harvested by a redraw that got here first: doing it twice would re-enter
+      // renderCanvas from inside its own removal loop.
+      if (!n.editing) return;
       delete n.editing;
       n.title = ta.value.trim();
       if (!n.title) STATE.notes = STATE.notes.filter(x => x.id !== n.id);
@@ -3193,20 +3285,18 @@ function buildNote(n) {
   } else {
     // The quick way onto either list: no dragging, no opening, just the one press.
     if (!n.completedAt) {
-      const onToday = isToday(n), onStar = isStarred(n);
-      const sun = h('button.todaybtn' + (onToday ? '.on' : ''), {
-        title: onToday ? 'On today’s list. Press to take it off' : 'Add to “Today I want to…”',
-        innerHTML: sunSvg(onToday),
-        // Act on the state this button is actually showing. Re-deriving it here would make
-        // a sun still lit from yesterday add the task instead of clearing it.
-        onclick: e => { e.stopPropagation(); if (n.completedAt) return; setToday(n, !onToday); },
+      const onStar = isStarred(n), onWork = isWorking(n);
+      const work = h('button.workbtn' + (onWork ? '.on' : ''), {
+        title: onWork ? 'You are working on this. Press to put it down' : 'Work on this one now',
+        innerHTML: workSvg(onWork),
+        onclick: e => { e.stopPropagation(); if (n.completedAt) return; setWorking(n, !onWork); },
       });
       const star = h('button.starbtn' + (onStar ? '.on' : ''), {
         title: onStar ? 'High priority. Press to take the star off' : 'Star it as high priority',
         innerHTML: starSvg(onStar),
         onclick: e => { e.stopPropagation(); if (n.completedAt) return; setStarred(n, !onStar); },
       });
-      const btns = h('div.nbtns', {}, sun, star);
+      const btns = h('div.nbtns', {}, work, star);
       // The card's own drag listener would otherwise start a drag from under the mark.
       btns.addEventListener('pointerdown', e => e.stopPropagation());
       el.append(btns);
@@ -5128,13 +5218,18 @@ function openChat(fid) {
 // two can never drift apart. Pass null for a wish that does not exist yet.
 function wishCondControls(w) {
   const habs = activeHabits();
+  // A wish may name a daily goal that has since been RETIRED, which keeps it out of
+  // activeHabits. It has to stay in this list: otherwise the control silently falls back to
+  // "no goal, just a wish", and pressing Save writes that emptiness over the condition.
+  const named = w && w.habitId && w.habitId !== '*' ? habitById(w.habitId) : null;
+  const pick = named && !habs.some(x => x.id === named.id) ? habs.concat([named]) : habs;
   const sel = h('select.input.grow', {},
     h('option', { value: '' }, 'no goal, just a wish'),
     STATE.goals.length ? h('optgroup', { label: 'Finish tasks' },
       STATE.goals.map(g => h('option', { value: 'g:' + g.id }, 'unlocks with: ' + g.name))) : null,
-    habs.length ? h('optgroup', { label: 'Days in a row' },
-      habs.map(hb => h('option', { value: 'h:' + hb.id }, 'days in a row of: ' + hb.name)),
-      habs.length > 1 ? h('option', { value: 'h:*' }, 'days in a row of: every daily goal') : null) : null);
+    pick.length ? h('optgroup', { label: 'Days in a row' },
+      pick.map(hb => h('option', { value: 'h:' + hb.id }, 'days in a row of: ' + hb.name + (hb.archivedAt ? ' (retired)' : ''))),
+      (pick.length > 1 || (w && w.habitId === '*')) ? h('option', { value: 'h:*' }, 'days in a row of: every daily goal') : null) : null);
   const days = h('input.input', { type: 'number', min: 1, max: 365, style: { width: '78px' }, title: 'How many days in a row' });
   const daysWrap = h('span.wdays', {}, days, h('span.wdayslab', {}, 'days in a row'));
   sel.value = w && w.habitId ? 'h:' + w.habitId : (w && w.goalId ? 'g:' + w.goalId : '');
@@ -5154,11 +5249,15 @@ function wishCondControls(w) {
   };
 }
 function wishCard(w) {
-  const goal = STATE.goals.find(g => g.id === w.goalId);
+  const goal = STATE.goals.find(g => g.id === w.goalId) || null;
   // A wish is held back by days in a row, or by finished tasks, never by both.
   const byStreak = wishStreakOn(w);
   const need = wishStreakNeed(w), have = byStreak ? wishStreakNow(w) : 0;
-  const unlocked = byStreak ? have >= need : (!goal || goalMet(goal));
+  // A condition naming something that no longer exists is NOT the same as no condition.
+  // Reading it as "unconditional" handed out the reward the moment a goal was deleted, or
+  // the moment the last daily goal was retired under an "every daily goal" wish.
+  const dangling = (!!w.goalId && !goal) || (!!w.habitId && !byStreak);
+  const unlocked = dangling ? false : (byStreak ? have >= need : (!goal || goalMet(goal)));
   const link = safeUrl(w.url);
   const card = h('div.gcard.wcard' + (w.claimedAt ? '.claimed' : ''));
 
@@ -5183,8 +5282,9 @@ function wishCard(w) {
 
   let stateEl = null;
   if (w.claimedAt) stateEl = h('span.wish-state', { style: { color: 'var(--ink3)' } }, 'Claimed ' + fmtD(w.claimedAt) + ' 🎉');
+  else if (dangling) stateEl = h('span.wish-state.locked', {}, 'Waiting on a goal that no longer exists. Press ✎ to point it at another one.');
   else if (byStreak && unlocked) stateEl = h('span.wish-state.unlocked', {}, 'Unlocked by ' + need + ' days in a row!');
-  else if (byStreak) stateEl = h('span.wish-state.locked', {}, have + ' of ' + need + ' days in a row (' + wishStreakName(w) + ')');
+  else if (byStreak) stateEl = h('span.wish-state.locked', {}, have + ' of ' + need + ' days in a row (' + wishStreakName(w) + (habitById(w.habitId) && habitById(w.habitId).archivedAt ? ', retired' : '') + ')');
   else if (goal && unlocked) stateEl = h('span.wish-state.unlocked', {}, 'Unlocked by “' + goal.name + '”!');
   else if (goal) stateEl = h('span.wish-state.locked', {}, (goal.target - goalCount(goal)) + ' more task' + (goal.target - goalCount(goal) === 1 ? '' : 's') + ' to unlock (' + goal.name + ')');
 
