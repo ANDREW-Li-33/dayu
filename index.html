@@ -281,7 +281,6 @@ main{flex:1;min-height:0;position:relative}
 .note .nmore{margin-top:6px}
 .note .nmore span{background:var(--note-ink2)}
 .note .ncat{letter-spacing:.05em;text-transform:uppercase;font-size:9.5px}
-.note .nsteps{font-variant-numeric:tabular-nums}
 .note.done{opacity:.55}
 .note.done .ntitle{text-decoration:line-through;text-decoration-thickness:1.5px}
 .note.done .chk{background:var(--good);border-color:var(--good)}
@@ -420,7 +419,7 @@ main{flex:1;min-height:0;position:relative}
 }
 @keyframes sheetin{from{opacity:0;transform:translate(-50%,-48%) scale(.96)}}
 .sheet .ctab{height:6px;flex:0 0 auto}
-.sheet .sbody{padding:20px 24px 22px;overflow-y:auto}
+.sheet .sbody{padding:20px 24px 22px;overflow-y:auto;scrollbar-gutter:stable}
 .sheet .srow{display:flex;align-items:flex-start;gap:12px}
 .sheet .bigchk{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:2.5px solid var(--line2);margin-top:4px;display:flex;align-items:center;justify-content:center;padding:0}
 .sheet .bigchk:hover{border-color:var(--good)}
@@ -465,20 +464,24 @@ main{flex:1;min-height:0;position:relative}
 .sheet .sec{margin-top:20px}
 .sheet .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .steps{display:flex;flex-direction:column;gap:2px}
-.step{display:flex;align-items:center;gap:9px;padding:5px 6px;border-radius:8px}
+.step{display:flex;align-items:flex-start;gap:9px;padding:5px 6px;border-radius:8px}
 .step:hover{background:var(--accent-soft)}
-.step .schk{flex:0 0 auto;width:17px;height:17px;border-radius:50%;border:2px solid var(--line2);padding:0;display:flex;align-items:center;justify-content:center}
+.step .schk{flex:0 0 auto;width:17px;height:17px;margin-top:2px;border-radius:50%;border:2px solid var(--line2);padding:0;display:flex;align-items:center;justify-content:center}
 .step .schk.done{background:var(--good);border-color:var(--good)}
 .step .schk svg{width:9px;height:9px}
 .step .schk .tickpath{stroke:#fff;stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.step input[type=text]{flex:1;border:none;outline:none;background:transparent;font-size:13.5px}
-.step.done input[type=text]{text-decoration:line-through;color:var(--ink3)}
-.step .sdel{color:var(--ink3);font-size:14px;width:22px;height:22px;border-radius:6px;visibility:hidden}
+/* A step wraps rather than scrolling out of sight: the box grows to the words in it, and
+   an unbroken run of characters breaks instead of pushing the row wider. */
+.step textarea,.addstep textarea{
+  flex:1;min-width:0;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
+  font:inherit;font-size:13.5px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;
+}
+.step.done textarea{text-decoration:line-through;color:var(--ink3)}
+.step .sdel{color:var(--ink3);font-size:14px;width:22px;height:22px;margin-top:-1px;border-radius:6px;visibility:hidden;flex:0 0 auto}
 .step:hover .sdel{visibility:visible}
 .step .sdel:hover{color:var(--danger);background:var(--danger-soft)}
-.addstep{display:flex;gap:9px;align-items:center;padding:5px 6px}
-.addstep .plus{color:var(--ink3);width:17px;text-align:center;font-weight:700}
-.addstep input{flex:1;border:none;outline:none;background:transparent;font-size:13.5px}
+.addstep{display:flex;gap:9px;align-items:flex-start;padding:5px 6px}
+.addstep .plus{color:var(--ink3);width:17px;margin-top:1px;text-align:center;font-weight:700;flex:0 0 auto}
 .catpick{display:flex;flex-wrap:wrap;gap:6px}
 .newcat{display:flex;gap:6px;margin-top:8px}
 .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
@@ -3310,7 +3313,6 @@ function buildNote(n) {
     const meta = h('div.nmeta');
     const cat = catById(n.catId);
     if (cat) meta.append(h('span.ncat', { style: { color: palById(cat.color).deep } }, cat.name));
-    if (n.steps.length) meta.append(h('span.nsteps', {}, n.steps.filter(s => s.done).length + '/' + n.steps.length + ' steps'));
     if (meta.children.length) el.append(meta);
   }
 
@@ -4106,25 +4108,46 @@ function openNote(id) {
 
 function renderSteps(n, box) {
   box.innerHTML = '';
+  // Steps were single-line inputs, so anything longer than the row scrolled sideways out of
+  // sight with nothing to say it was there. They are textareas that grow to their content
+  // instead, and Enter still means "done with this one" rather than a new line.
+  const grown = [];
+  const grow = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
+  const mk = props => {
+    const t = h('textarea', Object.assign({ rows: 1 }, props));
+    t.addEventListener('input', () => grow(t));
+    grown.push(t);
+    return t;
+  };
   for (const s of n.steps) {
-    const inp = h('input', { type: 'text', value: s.text });
+    const inp = mk({ value: s.text });
     inp.addEventListener('input', () => { s.text = inp.value; save(); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !imeBusy(e)) addInp.focus(); });
+    inp.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || e.shiftKey || imeBusy(e)) return;
+      e.preventDefault();
+      addInp.focus();
+    });
     const row = h('div.step' + (s.done ? '.done' : ''), {},
       h('button.schk' + (s.done ? '.done' : ''), { innerHTML: s.done ? TICK_SVG : '', onclick: () => { s.done = !s.done; save(); renderSteps(n, box); } }),
       inp,
       h('button.sdel', { title: 'Remove step', onclick: () => { n.steps = n.steps.filter(x => x.id !== s.id); save(); renderSteps(n, box); } }, '✕'));
     box.append(row);
   }
-  const addInp = h('input', { type: 'text', placeholder: n.steps.length ? 'Add another step…' : 'Break it down. Add a step…' });
+  const addInp = mk({ placeholder: n.steps.length ? 'Add another step…' : 'Break it down. Add a step…' });
   addInp.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !imeBusy(e) && addInp.value.trim()) {
-      n.steps.push({ id: uid(), text: addInp.value.trim(), done: false });
-      save(); renderSteps(n, box);
-      setTimeout(() => { const inps = $$('.addstep input', box.parentElement); if (inps.length) inps[inps.length - 1].focus(); }, 0);
-    }
+    if (e.key !== 'Enter' || e.shiftKey || imeBusy(e)) return;
+    e.preventDefault();
+    if (!addInp.value.trim()) return;
+    n.steps.push({ id: uid(), text: addInp.value.trim(), done: false });
+    save(); renderSteps(n, box);
+    setTimeout(() => { const t = $$('.addstep textarea', box.parentElement || box); if (t.length) t[t.length - 1].focus(); }, 0);
   });
   box.append(h('div.addstep', {}, h('span.plus', {}, '+'), addInp));
+  // Height needs the real layout, and the sheet is not in the document yet on first render.
+  // Twice: the first pass can push the sheet into scrolling, and the scrollbar that appears
+  // narrows the column, so the text reflows to more lines than were just measured.
+  const growAll = () => { for (const t of grown) if (t.isConnected) grow(t); };
+  setTimeout(() => { growAll(); requestAnimationFrame(growAll); }, 0);
 }
 
 // The picker itself, shown in a popover from the footer chip. `onChange` keeps that chip
@@ -4337,6 +4360,8 @@ function toggleHabit(hb, dk) {
   if (next) hb.days[dk] = next; else delete hb.days[dk];
   save();
   renderMeters();
+  // A wish can hang on a run of days, so a cell that changes the run changes the wish.
+  renderWishes();
   const habs = activeHabits();
   if (dk === todayKey() && lastSweepDay !== dk && habs.length && habs.every(habitCheckedToday)) {
     lastSweepDay = dk;
@@ -4857,8 +4882,9 @@ function renderGoals() {
 
   // --- wishlist ---
   wishCol.append(h('div.label', { style: { marginBottom: '10px' } }, 'Wishlist'));
-  if (!STATE.wishes.length) wishCol.append(h('div.empty', {}, 'Nothing on the wishlist yet.'));
-  for (const w of STATE.wishes) wishCol.append(wishCard(w));
+  const wishList = h('div', { id: 'wishList' });
+  wishCol.append(wishList);
+  renderWishes(wishList);
 
   const wText = h('input.input.grow', { placeholder: 'Working towards…', maxLength: 80 });
   const wUrl = h('input.input.grow', { placeholder: 'Paste a shop link (optional). Amazon links pull in a picture', maxLength: 600 });
@@ -5216,6 +5242,16 @@ function openChat(fid) {
 // The one control that says what is holding a wish back: a run of finished tasks, a run of
 // days on a daily goal, or nothing at all. Shared by the add form and the editor, so the
 // two can never drift apart. Pass null for a wish that does not exist yet.
+// Just the wish cards. Kept separate so that ticking a daily-goal cell can bring them up to
+// date without rebuilding the sheet, which would throw its horizontal scroll back to today,
+// and without clearing a half-typed new wish out of the form below them.
+function renderWishes(box) {
+  const list = box || $('#wishList');
+  if (!list) return;                      // the goals page is not on screen
+  list.innerHTML = '';
+  if (!STATE.wishes.length) { list.append(h('div.empty', {}, 'Nothing on the wishlist yet.')); return; }
+  for (const w of STATE.wishes) list.append(wishCard(w));
+}
 function wishCondControls(w) {
   const habs = activeHabits();
   // A wish may name a daily goal that has since been RETIRED, which keeps it out of
