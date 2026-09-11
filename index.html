@@ -463,25 +463,6 @@ main{flex:1;min-height:0;position:relative}
 .mdbody .mdbox.on{background:var(--good);border-color:var(--good)}
 .sheet .sec{margin-top:20px}
 .sheet .sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.steps{display:flex;flex-direction:column;gap:2px}
-.step{display:flex;align-items:flex-start;gap:9px;padding:5px 6px;border-radius:8px}
-.step:hover{background:var(--accent-soft)}
-.step .schk{flex:0 0 auto;width:17px;height:17px;margin-top:2px;border-radius:50%;border:2px solid var(--line2);padding:0;display:flex;align-items:center;justify-content:center}
-.step .schk.done{background:var(--good);border-color:var(--good)}
-.step .schk svg{width:9px;height:9px}
-.step .schk .tickpath{stroke:#fff;stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
-/* A step wraps rather than scrolling out of sight: the box grows to the words in it, and
-   an unbroken run of characters breaks instead of pushing the row wider. */
-.step textarea,.addstep textarea{
-  flex:1;min-width:0;border:none;outline:none;background:transparent;resize:none;overflow:hidden;
-  font:inherit;font-size:13.5px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;
-}
-.step.done textarea{text-decoration:line-through;color:var(--ink3)}
-.step .sdel{color:var(--ink3);font-size:14px;width:22px;height:22px;margin-top:-1px;border-radius:6px;visibility:hidden;flex:0 0 auto}
-.step:hover .sdel{visibility:visible}
-.step .sdel:hover{color:var(--danger);background:var(--danger-soft)}
-.addstep{display:flex;gap:9px;align-items:flex-start;padding:5px 6px}
-.addstep .plus{color:var(--ink3);width:17px;margin-top:1px;text-align:center;font-weight:700;flex:0 0 auto}
 .catpick{display:flex;flex-wrap:wrap;gap:6px}
 .newcat{display:flex;gap:6px;margin-top:8px}
 .meta{display:flex;gap:18px;flex-wrap:wrap;margin-top:20px;padding-top:14px;border-top:1px solid var(--line)}
@@ -895,7 +876,7 @@ table.htable{border-collapse:separate;border-spacing:0;width:100%;min-width:620p
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3.5 3" stroke-linecap="round"><rect x="4" y="5" width="16" height="14" rx="3"/></svg>
           Cluster
         </button>
-        <button id="btnLink" title="Draw an arrow from one task to the next">
+        <button id="btnLink" title="Draw an arrow from one task to the next (or press A)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h13"/><path d="M12 7l5 5-5 5"/></svg>
           Arrow
         </button>
@@ -1091,6 +1072,11 @@ function blankState() {
 // adoptLocal is true ONLY for the board loaded out of this browser's own storage.
 // A pulled remote board or an imported backup belongs to some other context, and must
 // never inherit a key left behind by whoever used this browser last.
+// The board as it stood just before sub-steps were stripped out of it, captured once so the
+// menu's Restore a backup can still reach it. Only the first purge of a session is kept: by
+// the time a later remote pull brings in another board carrying steps, the local one has
+// already been cleaned and there is nothing new to rescue.
+let purgedStepsBoard = null;
 function migrate(s) {
   if (!s.meta) s.meta = { updatedAt: Date.now() };
   if (!Array.isArray(s.habits)) s.habits = [];
@@ -1099,6 +1085,13 @@ function migrate(s) {
   // screen, never about the board, so it must not survive a reload or ride along to
   // another device: a board that loads with a phantom open editor looks stuck.
   for (const n of s.notes) delete n.editing;
+  // Sub-steps were taken out of the app. Strip what they left behind, so the arrays stop
+  // riding along in every save and every sync. Not gated on a version number: a board
+  // arriving from an older copy of Dayu has to be cleaned too.
+  if (s.notes.some(n => n.steps !== undefined)) {
+    if (!purgedStepsBoard) { try { purgedStepsBoard = JSON.parse(JSON.stringify(s)); } catch (e) { /* unclonable, carry on */ } }
+    for (const n of s.notes) delete n.steps;
+  }
   // Routines are written pieces with a place on their own board. Their shape is checked here
   // because a board that arrives with a routine missing its box would render at 0 by 0.
   if (!Array.isArray(s.routines)) s.routines = [];
@@ -1162,12 +1155,12 @@ function seedState() {
   s.zones.push({ id: uid(), catId: catStart.id, x: 620, y: 90, w: 340, h: 300 });
   const mk = (title, x, y, extra) => Object.assign({
     id: uid(), title, desc: '', x, y, catId: null,
-    createdAt: now, completedAt: null, archived: false, steps: [], z: ++s.zTop,
+    createdAt: now, completedAt: null, archived: false, z: ++s.zTop,
   }, extra || {});
   s.notes.push(
     mk('Drag me anywhere. Make a mess, then make it make sense', 120, 120),
     mk('Drop me into the cluster on the right →', 350, 250, {}),
-    mk('Click me (don’t drag) to open the big view and break me into steps', 140, 330),
+    mk('Click me (don’t drag) to open the big view and write a description', 140, 330),
     mk('Right-click me to delete me in two clicks', 140, 430),
     mk('Check my circle when you’re done with me, and watch the bar up top', 380, 530),
     mk('I live here, so my category is “Getting started”', 660, 150, { catId: catStart.id }),
@@ -1932,6 +1925,19 @@ function boardBulk(s) {
   return (s && s.notes ? s.notes.length : 0) + (s && s.zones ? s.zones.length : 0)
     + (s && s.routines ? s.routines.length : 0);
 }
+// File the pre-purge board into the backup slots, once, so a purge that happened silently on
+// load is still reachable from Menu, Restore a backup. Called from boot, after STATE exists:
+// stashBoard itself files the CURRENT board, which by then is already the cleaned one.
+function stashPurgedBoard() {
+  if (!purgedStepsBoard) return;
+  try {
+    const pack = JSON.stringify({ at: Date.now(), reason: 'before sub-steps were removed', board: purgedStepsBoard });
+    storeSet(BAK_KEYS.latest, pack);
+    const daily = readBak(BAK_KEYS.daily);
+    if (!daily || dayKey(daily.at) !== todayKey()) storeSet(BAK_KEYS.daily, pack);
+  } catch (e) { /* a full store must never block the boot */ }
+  purgedStepsBoard = null;
+}
 function stashBoard(reason, incoming) {
   try {
     if (!STATE || !boardBulk(STATE)) return;
@@ -2416,7 +2422,7 @@ function sharedPayload(z) {
     name: cat.name, color: cat.color, w: Math.round(z.w), h: Math.round(z.h),
     tasks: STATE.notes.filter(n => n.sharedId === z.sharedId).map(n => ({
       id: n.id, title: n.title || '', desc: n.desc || '',
-      images: n.images || null, steps: n.steps || [],
+      images: n.images || null,
       completedAt: n.completedAt || null, archived: !!n.archived,
       createdAt: n.createdAt || Date.now(),
       rx: Math.round(n.x - z.x), ry: Math.round(n.y - z.y),
@@ -2522,12 +2528,11 @@ function mergeSharedRow(row) {
     if (!t || !t.id) continue;
     keep[t.id] = true;
     let n = noteById(t.id);
-    if (!n) { n = { id: t.id, x: 0, y: 0, z: ++STATE.zTop, steps: [] }; STATE.notes.push(n); }
+    if (!n) { n = { id: t.id, x: 0, y: 0, z: ++STATE.zTop }; STATE.notes.push(n); }
     // The star is each person's own: a friend starring a shared task says nothing about mine.
     const mineStar = n.starredAt;
     n.title = t.title || ''; n.desc = t.desc || '';
     if (t.images) n.images = t.images; else delete n.images;
-    n.steps = Array.isArray(t.steps) ? t.steps : [];
     n.completedAt = t.completedAt || null;
     n.archived = !!t.archived;
     n.createdAt = t.createdAt || Date.now();
@@ -3066,7 +3071,7 @@ function setLinkMode(on) {
     btn.classList.toggle('on', on);
     btn.title = on
       ? 'Click the task that comes first, then the one that follows. Escape when you are done'
-      : 'Draw an arrow from one task to the next';
+      : 'Draw an arrow from one task to the next (or press A)';
   }
   const board = $('#board');
   if (board) board.classList.toggle('linking', on);
@@ -3412,7 +3417,7 @@ function newNoteAt(x, y) {
   const n = {
     id: uid(), title: '', desc: '', x, y,
     catId: (zoneAt(x + NOTE_W / 2, y + 35) || {}).catId || null,
-    createdAt: Date.now(), completedAt: null, archived: false, steps: [], z: ++STATE.zTop, editing: true,
+    createdAt: Date.now(), completedAt: null, archived: false, z: ++STATE.zTop, editing: true,
   };
   STATE.notes.push(n);
   save(); renderCanvas();
@@ -3746,6 +3751,12 @@ function wireCanvas() {
       e.preventDefault();
       if (currentPage() === 'routines') rFit(); else recenter();
     }
+    // A arms the arrow, the same as its toolbar button, and disarms it again. Canvas only:
+    // the routines board has no arrows to draw.
+    if ((e.key === 'a' || e.key === 'A') && currentPage() === 'canvas' && shortcutIsOurs(e, e.target)) {
+      e.preventDefault();
+      setLinkMode(!linkMode);
+    }
     if (e.code === 'Space' && spaceIsOurs(e.target)) {
       if (!spaceHeld) { spaceHeld = true; board.classList.add('panready'); }
       e.preventDefault(); // stop the page from scrolling under us
@@ -4065,12 +4076,6 @@ function openNote(id) {
   };
   paintDesc(false);
 
-  // steps
-  const stepsBox = h('div.steps');
-  body.append(h('div.sec', {},
-    h('div.sechead', {}, h('span.label', {}, 'Steps')),
-    stepsBox));
-  renderSteps(n, stepsBox);
 
   // completion date, if any, stays with the other detail up here; creation date moves to the footer below
   if (n.completedAt) {
@@ -4106,49 +4111,6 @@ function openNote(id) {
   setTimeout(() => { grow(ttl); if (!n.title) ttl.focus(); else sheet.focus(); }, 0);
 }
 
-function renderSteps(n, box) {
-  box.innerHTML = '';
-  // Steps were single-line inputs, so anything longer than the row scrolled sideways out of
-  // sight with nothing to say it was there. They are textareas that grow to their content
-  // instead, and Enter still means "done with this one" rather than a new line.
-  const grown = [];
-  const grow = t => { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; };
-  const mk = props => {
-    const t = h('textarea', Object.assign({ rows: 1 }, props));
-    t.addEventListener('input', () => grow(t));
-    grown.push(t);
-    return t;
-  };
-  for (const s of n.steps) {
-    const inp = mk({ value: s.text });
-    inp.addEventListener('input', () => { s.text = inp.value; save(); });
-    inp.addEventListener('keydown', e => {
-      if (e.key !== 'Enter' || e.shiftKey || imeBusy(e)) return;
-      e.preventDefault();
-      addInp.focus();
-    });
-    const row = h('div.step' + (s.done ? '.done' : ''), {},
-      h('button.schk' + (s.done ? '.done' : ''), { innerHTML: s.done ? TICK_SVG : '', onclick: () => { s.done = !s.done; save(); renderSteps(n, box); } }),
-      inp,
-      h('button.sdel', { title: 'Remove step', onclick: () => { n.steps = n.steps.filter(x => x.id !== s.id); save(); renderSteps(n, box); } }, '✕'));
-    box.append(row);
-  }
-  const addInp = mk({ placeholder: n.steps.length ? 'Add another step…' : 'Break it down. Add a step…' });
-  addInp.addEventListener('keydown', e => {
-    if (e.key !== 'Enter' || e.shiftKey || imeBusy(e)) return;
-    e.preventDefault();
-    if (!addInp.value.trim()) return;
-    n.steps.push({ id: uid(), text: addInp.value.trim(), done: false });
-    save(); renderSteps(n, box);
-    setTimeout(() => { const t = $$('.addstep textarea', box.parentElement || box); if (t.length) t[t.length - 1].focus(); }, 0);
-  });
-  box.append(h('div.addstep', {}, h('span.plus', {}, '+'), addInp));
-  // Height needs the real layout, and the sheet is not in the document yet on first render.
-  // Twice: the first pass can push the sheet into scrolling, and the scrollbar that appears
-  // narrows the column, so the text reflows to more lines than were just measured.
-  const growAll = () => { for (const t of grown) if (t.isConnected) grow(t); };
-  setTimeout(() => { growAll(); requestAnimationFrame(growAll); }, 0);
-}
 
 // The picker itself, shown in a popover from the footer chip. `onChange` keeps that chip
 // in step with whatever is chosen here.
@@ -4809,7 +4771,6 @@ function archiveCard(n) {
     h('div.adates', {}, 'Created ' + fmtDY(n.createdAt) + '  →  Done ' + fmtDY(n.completedAt) + (days ? '  (' + days + (days === 1 ? ' day)' : ' days)') : '  (same day)')),
     h('div.abot', {},
       cat ? h('span.minichip', {}, h('span.dot', { style: { background: palById(cat.color).bg, border: '1px solid ' + palById(cat.color).deep } }), cat.name) : null,
-      n.steps.length ? h('span.minichip', {}, n.steps.filter(s => s.done).length + '/' + n.steps.length + ' steps') : null,
       (n.desc || '').trim() ? h('span.nmore', { title: 'Has a description' }, h('span'), h('span'), h('span')) : null,
       h('span.spacer'),
       h('button.btn.ghost.small', { title: 'Back to the canvas, unchecked', onclick: () => {
@@ -5819,6 +5780,7 @@ function wireRoutines() {
 function boot() {
   STATE = loadState();
   storeSet(STORE_KEY, storeGet(STORE_KEY) || JSON.stringify(STATE)); // probe storage
+  stashPurgedBoard();   // keep whatever the steps purge just stripped, if it stripped any
   for (const g of STATE.goals) metBefore[g.id] = goalMet(g);
   wireTheme();
   wireMenu();
